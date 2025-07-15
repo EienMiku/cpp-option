@@ -10,7 +10,7 @@
 
 static_assert(__cpp_explicit_this_parameter >= 202110L, "Deducing `this` is required");
 
-static_assert(__cpp_lib_expected >= 202202L, "std::expected (C++23) is required");
+static_assert(__cpp_lib_expected >= 202202L, "`std::expected` is required");
 
 namespace opt {
     template <typename T>
