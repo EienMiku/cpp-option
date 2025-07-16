@@ -34,7 +34,7 @@ export namespace opt {
 
     class option_panic : public std::exception {
     public:
-        option_panic(const char *message) : message{ message } {}
+        option_panic(const char *message) noexcept : message{ message } {}
 
         const char *what() const noexcept override {
             return message;
@@ -51,11 +51,14 @@ export namespace opt {
         };
         bool has_value = false;
 
-        constexpr option_storage() : has_value{ false } {}
-        constexpr option_storage(const T &val) : value{ val }, has_value{ true } {}
-        constexpr option_storage(T &&val) : value{ std::move(val) }, has_value{ true } {}
+        constexpr option_storage() noexcept : has_value{ false } {}
+        constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<T>) :
+            value{ val }, has_value{ true } {}
+        constexpr option_storage(T &&val) noexcept(std::is_nothrow_move_constructible_v<T>) :
+            value{ std::move(val) }, has_value{ true } {}
 
-        constexpr option_storage(const option_storage &other) : has_value{ other.has_value } {
+        constexpr option_storage(const option_storage &other) noexcept(std::is_nothrow_copy_constructible_v<T>) :
+            has_value{ other.has_value } {
             if (has_value) {
                 new (&value) T(other.value);
             }
@@ -69,7 +72,8 @@ export namespace opt {
             }
         }
 
-        constexpr option_storage &operator=(const option_storage &other) {
+        constexpr option_storage &operator=(const option_storage &other) noexcept(
+            std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_destructible_v<T>) {
             if (this != &other) {
                 if (has_value) {
                     value.~T();
@@ -97,13 +101,15 @@ export namespace opt {
             return *this;
         }
 
-        constexpr ~option_storage() {
-            if (has_value) {
-                value.~T();
+        constexpr ~option_storage() noexcept {
+            if constexpr (!std::is_trivially_destructible_v<T>) {
+                if (has_value) {
+                    value.~T();
+                }
             }
         }
 
-        constexpr auto &&get(this auto &&self) {
+        constexpr auto &&get(this auto &&self) noexcept {
             return self.value;
         }
     };
@@ -113,15 +119,15 @@ export namespace opt {
         T *ptr         = nullptr;
         bool has_value = false;
 
-        constexpr option_storage() : ptr{ nullptr }, has_value{ false } {}
-        constexpr option_storage(T &val) : ptr{ &val }, has_value{ true } {}
+        constexpr option_storage() noexcept : ptr{ nullptr }, has_value{ false } {}
+        constexpr option_storage(T &val) noexcept : ptr{ &val }, has_value{ true } {}
 
         constexpr option_storage(const option_storage &other)            = default;
         constexpr option_storage(option_storage &&other)                 = default;
         constexpr option_storage &operator=(const option_storage &other) = default;
         constexpr option_storage &operator=(option_storage &&other)      = default;
 
-        constexpr T &get() const {
+        constexpr T &get() const noexcept {
             return *ptr;
         }
     };
@@ -130,10 +136,10 @@ export namespace opt {
     struct option_storage<void> {
         bool has_value = false;
 
-        constexpr option_storage() : has_value{ false } {}
-        constexpr option_storage(bool has_val) : has_value{ has_val } {}
+        constexpr option_storage() noexcept : has_value{ false } {}
+        constexpr option_storage(bool has_val) noexcept : has_value{ has_val } {}
 
-        constexpr void get() const {}
+        constexpr void get() const noexcept {}
     };
 
     template <typename T>
@@ -144,33 +150,33 @@ export namespace opt {
     public:
         using value_type = T;
 
-        constexpr option() = default;
+        constexpr option() noexcept = default;
 
-        constexpr option(bool has_value)
+        constexpr option(bool has_value) noexcept
             requires std::same_as<T, void>
             : storage{ has_value } {}
 
         template <typename U = T>
-        constexpr option(const U &value)
+        constexpr option(const U &value) noexcept(std::is_nothrow_constructible_v<option_storage<T>, const U &>)
             requires (!std::is_reference_v<T>)
                   && (!std::same_as<std::decay_t<U>, option<T>>)
                   && (!std::same_as<T, void>)
             : storage{ value } {}
 
         template <typename U = T>
-        constexpr option(U &&value)
+        constexpr option(U &&value) noexcept(std::is_nothrow_constructible_v<option_storage<T>, U &&>)
             requires (!std::is_reference_v<T>)
                   && (!std::same_as<std::decay_t<U>, option<T>>)
                   && (!std::same_as<T, void>)
             : storage{ std::move(value) } {}
 
         template <typename U = T>
-        constexpr option(std::remove_reference_t<U> &value)
+        constexpr option(std::remove_reference_t<U> &value) noexcept
             requires std::is_reference_v<T>
             : storage{ value } {}
 
         template <option_type U>
-        constexpr auto and_(this auto &&self, U &&optb) {
+        constexpr auto and_(this auto &&self, U &&optb) noexcept(std::is_nothrow_constructible_v<std::decay_t<U>>) {
             if (self.is_some()) {
                 return std::forward<U>(optb);
             }
@@ -219,7 +225,7 @@ export namespace opt {
             });
         }
 
-        constexpr auto as_mut() {
+        constexpr auto as_mut() noexcept {
             using mut_ref_type = std::conditional_t<std::is_reference_v<T>, std::remove_reference_t<T> &, T &>;
             if (is_some()) {
                 return option<mut_ref_type>{ storage.get() };
@@ -227,7 +233,7 @@ export namespace opt {
             return option<mut_ref_type>{};
         }
 
-        constexpr auto as_ref() const {
+        constexpr auto as_ref() const noexcept {
             using const_ref_type =
                 std::conditional_t<std::is_reference_v<T>, const std::remove_reference_t<T> &, const T &>;
             if (is_some()) {
@@ -245,7 +251,7 @@ export namespace opt {
             return option<T>{};
         }
 
-        constexpr auto copied() const
+        constexpr auto copied() const noexcept(std::is_nothrow_copy_constructible_v<option<T>>)
             requires std::copy_constructible<T> && (!std::is_reference_v<T>)
         {
             return *this;
@@ -337,7 +343,7 @@ export namespace opt {
             return self;
         }
 
-        constexpr bool is_none() const {
+        constexpr bool is_none() const noexcept {
             return !storage.has_value;
         }
 
@@ -348,7 +354,7 @@ export namespace opt {
             return self.is_none() || std::invoke(std::forward<F>(predicate), self.storage.get());
         }
 
-        constexpr bool is_some() const {
+        constexpr bool is_some() const noexcept {
             return storage.has_value;
         }
 
@@ -547,7 +553,7 @@ export namespace opt {
             return T{};
         }
 
-        constexpr auto unwrap_unchecked(this auto &&self) -> decltype(self.storage.get()) {
+        constexpr auto unwrap_unchecked(this auto &&self) noexcept -> decltype(self.storage.get()) {
             if (self.storage.has_value) {
                 return self.storage.get();
             }
@@ -629,11 +635,12 @@ export namespace opt {
             return std::invoke(std::forward<F>(f));
         }
 
-        static constexpr auto default_() -> option<T> {
+        static constexpr auto default_() noexcept -> option<T> {
             return option<T>{};
         }
 
-        constexpr bool operator==(const option &other) const {
+        constexpr bool operator==(const option &other) const
+            noexcept(noexcept(std::declval<T>() == std::declval<T>())) {
             if (is_some() && other.is_some()) {
                 return storage.get() == other.storage.get();
             }
@@ -662,12 +669,13 @@ export namespace opt {
         }
 
         constexpr auto cmp(const option<T> &other) const
+            noexcept(noexcept(std::declval<option<T>>() <=> std::declval<option<T>>()))
             requires std::three_way_comparable<T>
         {
             return *this <=> other;
         }
 
-        constexpr auto max(this auto &&self, option<T> &&other)
+        constexpr auto max(this auto &&self, option<T> &&other) noexcept(noexcept(self > other))
             requires std::three_way_comparable<T>
         {
             if (self.is_some() && other.is_some()) {
@@ -676,7 +684,7 @@ export namespace opt {
             return self.is_some() ? self : std::move(other);
         }
 
-        constexpr auto min(this auto &&self, option<T> &&other)
+        constexpr auto min(this auto &&self, option<T> &&other) noexcept(noexcept(self < other))
             requires std::three_way_comparable<T>
         {
             if (self.is_some() && other.is_some()) {
@@ -685,7 +693,8 @@ export namespace opt {
             return self.is_some() ? self : std::move(other);
         }
 
-        constexpr auto clamp(this auto &&self, option<T> &&min, option<T> &&max)
+        constexpr auto clamp(this auto &&self, option<T> &&min,
+                             option<T> &&max) noexcept(noexcept(self < min) && noexcept(self > max))
             requires std::three_way_comparable<T>
         {
             if (self.is_some()) {
@@ -700,43 +709,43 @@ export namespace opt {
             return option<T>{};
         }
 
-        constexpr auto eq(this auto &&self, const option<T> &other)
+        constexpr auto eq(this auto &&self, const option<T> &other) noexcept(noexcept(self == other))
             requires std::equality_comparable<T>
         {
             return self == other;
         }
 
-        constexpr auto ne(this auto &&self, const option<T> &other)
+        constexpr auto ne(this auto &&self, const option<T> &other) noexcept(noexcept(self != other))
             requires std::equality_comparable<T>
         {
             return self != other;
         }
 
-        constexpr auto partial_cmp(this auto &&self, const option<T> &other)
+        constexpr auto partial_cmp(this auto &&self, const option<T> &other) noexcept(noexcept(self.cmp(other)))
             requires std::three_way_comparable<T>
         {
             return self.cmp(other);
         }
 
-        constexpr auto lt(this auto &&self, const option<T> &other)
+        constexpr auto lt(this auto &&self, const option<T> &other) noexcept(noexcept(self < other))
             requires std::three_way_comparable<T>
         {
             return self < other;
         }
 
-        constexpr auto le(this auto &&self, const option<T> &other)
+        constexpr auto le(this auto &&self, const option<T> &other) noexcept(noexcept(self <= other))
             requires std::three_way_comparable<T>
         {
             return self <= other;
         }
 
-        constexpr auto gt(this auto &&self, const option<T> &other)
+        constexpr auto gt(this auto &&self, const option<T> &other) noexcept(noexcept(self > other))
             requires std::three_way_comparable<T>
         {
             return self > other;
         }
 
-        constexpr auto ge(this auto &&self, const option<T> &other)
+        constexpr auto ge(this auto &&self, const option<T> &other) noexcept(noexcept(self >= other))
             requires std::three_way_comparable<T>
         {
             return self >= other;
@@ -754,7 +763,8 @@ export namespace opt {
     };
 
     template <typename T>
-    constexpr auto operator<=>(const option<T> &lhs, const option<T> &rhs) {
+    constexpr auto operator<=>(const option<T> &lhs,
+                               const option<T> &rhs) noexcept(noexcept(std::declval<T>() <=> std::declval<T>())) {
         if (lhs.is_some() && rhs.is_some()) {
             return lhs.unwrap() <=> rhs.unwrap();
         }
@@ -768,16 +778,16 @@ export namespace opt {
     }
 
     template <typename T>
-    constexpr auto some(const T &value) {
+    constexpr auto some(const T &value) noexcept(std::is_nothrow_constructible_v<option<T>, const T &>) {
         return option<T>{ value };
     }
 
     template <typename T>
-    constexpr auto some(T &&value) {
+    constexpr auto some(T &&value) noexcept(std::is_nothrow_constructible_v<option<T>, T &&>) {
         return option<T>{ std::move(value) };
     }
 
-    constexpr auto some() {
+    constexpr auto some() noexcept {
         return option<void>{ true };
     }
 
@@ -795,7 +805,7 @@ export namespace opt {
 
 export template <typename T>
 struct std::formatter<opt::option<T>> {
-    constexpr auto parse(format_parse_context &ctx) {
+    constexpr auto parse(format_parse_context &ctx) noexcept {
         return ctx.begin();
     }
 
