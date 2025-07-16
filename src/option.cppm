@@ -186,11 +186,11 @@ export namespace opt {
         template <typename F>
         constexpr auto and_then(this auto &&self, F &&f)
             requires (!std::same_as<T, void>)
-                  && std::invocable<F, decltype(std::forward<decltype(self)>(self).unwrap())>
+                  && std::invocable<F, decltype(std::forward_like<decltype(self)>(self.unwrap()))>
         {
-            using result_type = std::invoke_result_t<F, decltype(std::forward<decltype(self)>(self).unwrap())>;
+            using result_type = std::invoke_result_t<F, decltype(std::forward_like<decltype(self)>(self.unwrap()))>;
             if (self.is_some()) {
-                return std::invoke(std::forward<F>(f), std::forward<decltype(self)>(self).unwrap());
+                return std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(self.unwrap()));
             }
             return result_type{};
         }
@@ -289,7 +289,7 @@ export namespace opt {
             requires option_type<T>
         {
             if (self.is_some()) {
-                return self.unwrap();
+                return std::forward_like<decltype(self)>(self.unwrap());
             }
             return T{};
         }
@@ -383,14 +383,14 @@ export namespace opt {
                 }
                 return option<result_type>{};
             } else {
-                using result_type = std::invoke_result_t<F, decltype(std::forward<decltype(self)>(self).unwrap())>;
+                using result_type = std::invoke_result_t<F, decltype(std::forward_like<decltype(self)>(self.unwrap()))>;
                 if (self.is_some()) {
                     if constexpr (std::same_as<result_type, void>) {
-                        std::invoke(std::forward<F>(f), std::forward<decltype(self)>(self).unwrap());
+                        std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(self.unwrap()));
                         return option<void>{ true };
                     } else {
                         return option<result_type>{ std::invoke(std::forward<F>(f),
-                                                                std::forward<decltype(self)>(self).unwrap()) };
+                                                                std::forward_like<decltype(self)>(self.unwrap())) };
                     }
                 }
                 return option<result_type>{};
@@ -401,10 +401,10 @@ export namespace opt {
         constexpr auto map_or(this auto &&self, U &&default_value, F &&f)
             requires (std::is_lvalue_reference_v<decltype(self)> ? std::copy_constructible<T>
                                                                  : std::move_constructible<T>)
-                  && std::invocable<F, decltype(std::forward<decltype(self)>(self).unwrap())>
+                  && std::invocable<F, decltype(std::forward_like<decltype(self)>(self.unwrap()))>
         {
             if (self.is_some()) {
-                return std::invoke(std::forward<F>(f), std::forward<decltype(self)>(self).unwrap());
+                return std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(self.unwrap()));
             }
             return std::forward<U>(default_value);
         }
@@ -413,11 +413,11 @@ export namespace opt {
         constexpr auto map_or_else(this auto &&self, D &&default_f, F &&f)
             requires (std::is_lvalue_reference_v<decltype(self)> ? std::copy_constructible<T>
                                                                  : std::move_constructible<T>)
-                  && std::invocable<F, decltype(std::forward<decltype(self)>(self).unwrap())>
+                  && std::invocable<F, decltype(std::forward_like<decltype(self)>(self.unwrap()))>
                   && std::invocable<D>
         {
             if (self.is_some()) {
-                return std::invoke(std::forward<F>(f), std::forward<decltype(self)>(self).unwrap());
+                return std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(self.unwrap()));
             }
             return std::invoke(std::forward<D>(default_f));
         }
@@ -430,7 +430,7 @@ export namespace opt {
         {
             using result_type = std::expected<T, std::decay_t<E>>;
             if (self.is_some()) {
-                return result_type{ std::forward<decltype(self)>(self).unwrap() };
+                return result_type{ std::forward_like<decltype(self)>(self.unwrap()) };
             }
             return result_type{ std::unexpect, std::forward<E>(err) };
         }
@@ -444,7 +444,7 @@ export namespace opt {
         {
             using result_type = std::expected<T, std::invoke_result_t<F>>;
             if (self.is_some()) {
-                return result_type{ std::forward<decltype(self)>(self).unwrap() };
+                return result_type{ std::forward_like<decltype(self)>(self.unwrap()) };
             }
             return result_type{ std::unexpect, std::invoke(std::forward<F>(f)) };
         }
@@ -453,7 +453,7 @@ export namespace opt {
         constexpr auto or_(this auto &&self, U &&optb) {
             if (self.is_some()) {
                 using self_type = std::decay_t<decltype(self)>;
-                return self_type{ std::forward<decltype(self)>(self).unwrap() };
+                return self_type{ std::forward_like<decltype(self)>(self.unwrap()) };
             }
             return std::forward<U>(optb);
         }
@@ -539,7 +539,7 @@ export namespace opt {
                   && std::convertible_to<U, T>
         {
             if (self.is_some()) {
-                return self.unwrap();
+                return std::forward_like<decltype(self)>(self.unwrap());
             }
             return std::forward<U>(default_value);
         }
@@ -548,7 +548,7 @@ export namespace opt {
             requires (!std::same_as<T, void>) && std::default_initializable<T>
         {
             if (self.is_some()) {
-                return self.unwrap();
+                return std::forward_like<decltype(self)>(self.unwrap());
             }
             return T{};
         }
@@ -567,8 +567,9 @@ export namespace opt {
             using second_type = decltype(self.unwrap().second);
 
             if (self.is_some()) {
-                auto &pair = self.unwrap();
-                return std::pair{ option<first_type>{ pair.first }, option<second_type>{ pair.second } };
+                auto &&pair = std::forward_like<decltype(self)>(self.unwrap());
+                return std::pair{ option<first_type>{ std::forward_like<decltype(pair)>(pair.first) },
+                                  option<second_type>{ std::forward_like<decltype(pair)>(pair.second) } };
             }
             return std::pair{ option<first_type>{}, option<second_type>{} };
         }
@@ -600,7 +601,8 @@ export namespace opt {
         {
             if (self.is_some() && optb.is_some()) {
                 return option<std::pair<T, typename std::decay_t<U>::value_type>>{
-                    { self.unwrap(), optb.unwrap() }
+                    { std::forward_like<decltype(self)>(self.unwrap()),
+                     std::forward_like<decltype(optb)>(optb.unwrap()) }
                 };
             }
             return option<std::pair<T, typename std::decay_t<U>::value_type>>{};
@@ -617,7 +619,9 @@ export namespace opt {
         {
             using result_type = std::invoke_result_t<F, decltype(self.unwrap()), decltype(other.unwrap())>;
             if (self.is_some() && other.is_some()) {
-                return option<result_type>{ std::invoke(std::forward<F>(f), self.unwrap(), other.unwrap()) };
+                return option<result_type>{ std::invoke(std::forward<F>(f),
+                                                        std::forward_like<decltype(self)>(self.unwrap()),
+                                                        std::forward_like<decltype(other)>(other.unwrap())) };
             }
             return option<result_type>{};
         }
@@ -630,7 +634,7 @@ export namespace opt {
                   && std::convertible_to<std::invoke_result_t<F>, T>
         {
             if (self.is_some()) {
-                return self.unwrap();
+                return std::forward_like<decltype(self)>(self.unwrap());
             }
             return std::invoke(std::forward<F>(f));
         }
@@ -802,6 +806,7 @@ export namespace opt {
     template <typename T>
     option(T) -> option<T>;
 } // namespace opt
+
 
 export template <typename T>
 struct std::formatter<opt::option<T>> {
