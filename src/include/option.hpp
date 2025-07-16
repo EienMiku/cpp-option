@@ -59,14 +59,16 @@ namespace opt {
         constexpr option_storage(T &&val) noexcept(std::is_nothrow_move_constructible_v<T>) :
             value{ std::move(val) }, has_value{ true } {}
 
-        constexpr option_storage(const option_storage &other) noexcept(std::is_nothrow_copy_constructible_v<T>) :
+        constexpr option_storage(const option_storage &other) noexcept(std::is_nothrow_copy_constructible_v<T>)
+            requires std::copy_constructible<T> :
             has_value{ other.has_value } {
             if (has_value) {
                 new (&value) T(other.value);
             }
         }
 
-        constexpr option_storage(option_storage &&other) noexcept(std::is_nothrow_move_constructible_v<T>) :
+        constexpr option_storage(option_storage &&other) noexcept(std::is_nothrow_move_constructible_v<T>)
+            requires std::move_constructible<T> :
             has_value{ other.has_value } {
             if (has_value) {
                 new (&value) T(std::move(other.value));
@@ -75,7 +77,8 @@ namespace opt {
         }
 
         constexpr option_storage &operator=(const option_storage &other) noexcept(
-            std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_destructible_v<T>) {
+            std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_destructible_v<T>)
+            requires std::copy_constructible<T> {
             if (this != &other) {
                 if (has_value) {
                     value.~T();
@@ -89,7 +92,8 @@ namespace opt {
         }
 
         constexpr option_storage &operator=(option_storage &&other) noexcept(std::is_nothrow_move_constructible_v<T>
-                                                                             && std::is_nothrow_destructible_v<T>) {
+                                                                             && std::is_nothrow_destructible_v<T>)
+            requires std::move_constructible<T> {
             if (this != &other) {
                 if (has_value) {
                     value.~T();
@@ -153,6 +157,11 @@ namespace opt {
         using value_type = T;
 
         constexpr option() noexcept = default;
+        
+        constexpr option(const option&) requires std::copy_constructible<T> = default;
+        constexpr option(option&&) requires std::move_constructible<T> = default;
+        constexpr option& operator=(const option&) requires std::copy_constructible<T> = default;
+        constexpr option& operator=(option&&) requires std::move_constructible<T> = default;
 
         constexpr option(bool has_value) noexcept
             requires std::same_as<T, void>
@@ -282,7 +291,7 @@ namespace opt {
             requires std::predicate<F, decltype(self.storage.get())>
         {
             if (self.is_some() && std::invoke(std::forward<F>(predicate), self.storage.get())) {
-                return self;
+                return std::decay_t<decltype(self)>{ self };
             }
             return std::decay_t<decltype(self)>{};
         }
@@ -334,7 +343,7 @@ namespace opt {
         }
 
         template <typename F>
-        constexpr auto inspect(this auto &&self, F &&f) -> decltype(self) {
+        constexpr auto inspect(this auto &&self, F &&f) {
             if (self.is_some()) {
                 if constexpr (std::same_as<T, void>) {
                     std::invoke(std::forward<F>(f));
@@ -461,7 +470,7 @@ namespace opt {
         }
 
         template <typename F>
-        constexpr auto or_else(this auto &&self, F &&f) -> decltype(self)
+        constexpr auto or_else(this auto &&self, F &&f)
             requires option_type<std::invoke_result_t<F>>
         {
             if (self.is_some()) {
@@ -482,7 +491,7 @@ namespace opt {
             return old;
         }
 
-        constexpr auto take(this auto &&self) -> option<T> {
+        constexpr auto take(this auto &&self) {
             option<T> result;
             if (self.storage.has_value) {
                 std::ranges::swap(self.storage, result.storage);
@@ -491,7 +500,7 @@ namespace opt {
         }
 
         template <typename F>
-        constexpr auto take_if(this auto &&self, F &&f) -> option<T>
+        constexpr auto take_if(this auto &&self, F &&f)
             requires std::predicate<F, decltype(self.storage.get())>
         {
             option<T> result;
@@ -641,7 +650,7 @@ namespace opt {
             return std::invoke(std::forward<F>(f));
         }
 
-        static constexpr auto default_() noexcept -> option<T> {
+        static constexpr auto default_() noexcept {
             return option<T>{};
         }
 
@@ -654,7 +663,7 @@ namespace opt {
         }
 
         template <typename U>
-        static constexpr auto from(option<U> &other) -> option<T>
+        static constexpr auto from(option<U> &other)
             requires std::is_reference_v<T> && std::same_as<T, U &>
         {
             if (other.is_some()) {
@@ -664,7 +673,7 @@ namespace opt {
         }
 
         template <typename U>
-        static constexpr auto from(U &&value) -> option<T>
+        static constexpr auto from(U &&value)
             requires std::constructible_from<T, U>
         {
             if constexpr (std::is_rvalue_reference_v<decltype(value)>) {
@@ -818,26 +827,31 @@ namespace opt {
     }
 
     template <typename T>
+        requires (!std::is_reference_v<T>)
     constexpr auto some(const T &value) noexcept(std::is_nothrow_constructible_v<option<T>, const T &>) {
         return option<T>{ value };
     }
 
     template <typename T>
+        requires (!std::is_reference_v<T>)
     constexpr auto some(T &&value) noexcept(std::is_nothrow_constructible_v<option<T>, T &&>) {
         return option<T>{ std::move(value) };
+    }
+
+    template <typename T>
+        requires (std::is_lvalue_reference_v<T>)
+    constexpr auto some(T value) noexcept {
+        return option<T>{ value };
     }
 
     constexpr auto some() noexcept {
         return option<void>{ true };
     }
 
-    // template <typename T>
-    // constexpr auto none() {
-    //     return option<T>{};
-    // }
-
     template <typename T>
-    constexpr auto none = option<T>{};
+    constexpr auto none() {
+        return option<T>{};
+    }
 
     template <typename T>
     option(T) -> option<T>;
