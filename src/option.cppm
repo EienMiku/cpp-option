@@ -678,6 +678,15 @@ export namespace opt {
         {
             return *this <=> other;
         }
+        
+        constexpr auto max(this auto &&self, const option<T> &other) noexcept(noexcept(self > other))
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some() && other.is_some()) {
+                return self > other ? self : other;
+            }
+            return self.is_some() ? self : other;
+        }
 
         constexpr auto max(this auto &&self, option<T> &&other) noexcept(noexcept(self > other))
             requires std::three_way_comparable<T>
@@ -688,6 +697,15 @@ export namespace opt {
             return self.is_some() ? self : std::move(other);
         }
 
+        constexpr auto min(this auto &&self, const option<T> &other) noexcept(noexcept(self < other))
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some() && other.is_some()) {
+                return self < other ? self : other;
+            }
+            return self.is_some() ? self : other;
+        }
+
         constexpr auto min(this auto &&self, option<T> &&other) noexcept(noexcept(self < other))
             requires std::three_way_comparable<T>
         {
@@ -695,6 +713,22 @@ export namespace opt {
                 return self < other ? self : std::move(other);
             }
             return self.is_some() ? self : std::move(other);
+        }
+
+        constexpr auto clamp(this auto &&self, const option<T> &min,
+                             const option<T> &max) noexcept(noexcept(self < min) && noexcept(self > max))
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some()) {
+                if (min.is_some() && self < min) {
+                    return min;
+                }
+                if (max.is_some() && self > max) {
+                    return max;
+                }
+                return self;
+            }
+            return option<T>{};
         }
 
         constexpr auto clamp(this auto &&self, option<T> &&min,
