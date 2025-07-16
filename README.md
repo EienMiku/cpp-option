@@ -40,7 +40,7 @@ int result = empty.unwrap_or(0);
 ## Core Methods
 
 ### Creation
-- `opt::some(value)` - create option with value
+- `opt::some()` - create option with value
 - `opt::none<T>` - create empty option
 - `opt::some()` - create void option
 
@@ -50,7 +50,7 @@ int result = empty.unwrap_or(0);
 
 ### Value extraction
 - `unwrap()` - extract value, panic if empty
-- `unwrap_or(default)` - extract value or return default
+- `unwrap_or()` - extract value or return default
 - `unwrap_or_default()` - extract value or return default constructed
 - `expect()` - extract value or panic with message
 
