@@ -196,6 +196,7 @@ export namespace opt {
         constexpr auto and_then(this auto &&self, F &&f)
             requires (!std::same_as<T, void>)
                   && std::invocable<F, decltype(std::forward_like<decltype(self)>(self.unwrap()))>
+                  && option_type<std::invoke_result_t<F, decltype(std::forward_like<decltype(self)>(self.unwrap()))>>
         {
             using result_type = std::invoke_result_t<F, decltype(std::forward_like<decltype(self)>(self.unwrap()))>;
             if (self.is_some()) {

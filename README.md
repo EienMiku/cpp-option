@@ -1,23 +1,22 @@
 # cpp-option
 
-[中文版](README_zh.md)
+[中文](README_zh.md)
 
-A C++23 implementation of Rust's `Option` type for type-safe null value handling.
+`cpp-option` is a generic library based on C++23, implementing a type-safe optional value container similar to Rust's `Option` type. The library aims to provide safer and more concise handling of nullable values in C++, supporting rich operations and modern C++ features.
 
 ## Overview
 
-The `option` type represents an optional value: every `option` either contains a value or is empty. `option` types are very common in Rust code, as they have a number of uses:
+`opt::option<T>` represents an optional value: it either contains a value of type `T` (Some), or is empty (None). This type is useful for:
 
-- Initial values
-- Return values for functions that are not defined over their entire input range (partial functions)
-- Return value for otherwise reporting simple errors, where an empty `option` is returned on error
+- Initial values for variables
+- Return values for functions that may fail (e.g., lookup, parse)
+- Simple error reporting (None means error)
 - Optional struct fields
-- Struct fields that can be loaned or "taken"
-- Optional function arguments  
-- Nullable pointers
-- Swapping things out of difficult situations
+- Optional function parameters
+- Safe wrapper for nullable pointers
+- Value swapping and ownership transfer in complex scenarios
 
-`option`s are commonly paired with conditional checks to query the presence of a value and take action, always accounting for the empty case.
+With `option`, you can explicitly handle the presence or absence of a value, avoiding common errors like null pointer dereference or uninitialized variables.
 
 ```cpp
 #include "option.hpp"
@@ -25,35 +24,30 @@ The `option` type represents an optional value: every `option` either contains a
 opt::option<double> divide(double numerator, double denominator) {
     if (denominator == 0.0) {
         return opt::none<double>();
-    } else {
-        return opt::some(numerator / denominator);
     }
+    return opt::some(numerator / denominator);
 }
 
 auto result = divide(2.0, 3.0);
-
-// Check for the presence of a value
 if (result.is_some()) {
-    // The division was valid
-    std::println("The result is: {}", result);
+    std::println("Result: {}", result.unwrap());
 } else {
-    // The division was invalid
-    std::println("Cannot divide by 0");
+    std::println("Cannot divide by zero");
 }
 ```
 
-## Options and raw pointers
+## `option` vs Raw Pointers
 
-C++'s raw pointer types can point to null; however, this leads to null pointer dereferences and undefined behavior. `option` can be used to wrap raw pointers for additional safety, though modern C++ prefers smart pointers for automatic memory management.
+C++ raw pointers can be null, which may lead to undefined behavior. `option` can safely wrap raw pointers, but it's recommended to use smart pointers (`std::unique_ptr`, `std::shared_ptr`) when possible.
 
 ```cpp
 #include "option.hpp"
 
 void check_optional(const opt::option<int*>& optional) {
     if (optional.is_some()) {
-        std::println("has value {}", *optional.unwrap());
+        std::println("Has value {}", *optional.unwrap());
     } else {
-        std::println("has no value");
+        std::println("No value");
     }
 }
 
@@ -67,11 +61,9 @@ int main() {
 }
 ```
 
-Note: For modern C++ code, consider using smart pointers (`std::unique_ptr`, `std::shared_ptr`) directly instead of wrapping them in `option`, as smart pointers already provide memory safety and null-checking capabilities.
+## Error Handling and Chaining
 
-## Error handling pattern
-
-Similar to Rust, when writing code that calls many functions that return the `option` type, handling values and empty states can be tedious. Method chaining provides a clean way to handle this:
+When multiple operations may return `option`, you can use method chaining to simplify nested checks:
 
 ```cpp
 #include "option.hpp"
@@ -116,23 +108,22 @@ for (int x : values) {
 // results: ["error!", "error!", "foo", "error!", "bar"]
 ```
 
-## Representation
+## Implementation Notes
 
-This C++ implementation uses a union-based storage similar to `std::optional`, but with additional features inspired by Rust's `Option`. The implementation supports:
+This library uses a union-based storage mechanism, supporting value types, reference types (as pointers), and `void` (presence only), combining Rust `Option` semantics with C++23 features:
 
-- Value types
-- Reference types (via pointer storage)
-- `void` type (representing boolean-like "has value" or "empty" states)
-- Move semantics and perfect forwarding
-- `constexpr` operations where possible
+- Complete move/copy semantics and perfect forwarding
+- Extensive `constexpr` support
+- Explicit `this` parameter (deducing this)
+- Integration with standard types like `std::expected`, `std::pair`, etc.
 
 ## Method Overview
 
-In addition to working with conditional checks, `option` provides a wide variety of different methods.
+Besides basic checks, `option` provides a rich set of member methods for state queries, value extraction, transformation, combination, in-place modification, and type conversion.
 
-### Querying the variant
+### State Queries
 
-The `is_some()` and `is_none()` methods return `true` if the `option` contains a value or is empty, respectively.
+`is_some()` / `is_none()`: Check if value is present.
 
 ```cpp
 constexpr auto x = opt::some(2);
@@ -142,7 +133,7 @@ constexpr auto y = opt::none<int>();
 static_assert(y.is_none());
 ```
 
-The `is_some_and()` and `is_none_or()` methods test the contained value against a predicate:
+`is_some_and()` and `is_none_or()` can be used with predicates:
 
 ```cpp
 constexpr auto x = opt::some(2);
@@ -152,28 +143,26 @@ constexpr auto y = opt::none<int>();
 static_assert(y.is_none_or([](int x) { return x == 2; }));
 ```
 
-### Adapters for working with references
+### Reference Adapters
 
-- `as_ref()` converts from `option<T>` to `option<const T&>`
-- `as_mut()` converts from `option<T>` to `option<T&>`
-- `as_deref()` converts from `option<T>` to `option<const T::element_type&>` (for smart pointers)
-- `as_deref_mut()` converts from `option<T>` to `option<T::element_type&>` (for smart pointers)
+- `as_ref()`: Convert to `option<const T&>`
+- `as_mut()`: Convert to `option<T&>`
+- `as_deref()`: Dereference and convert to `option<const T::element_type&>` (for pointers/smart pointers)
+- `as_deref_mut()`: Dereference and convert to `option<T::element_type&>`
 
 ```cpp
 constexpr auto x = opt::some(std::string("hello"));
 static_assert(std::same_as<decltype(x.as_ref()), opt::option<const std::string &>>);
 ```
 
-### Extracting the contained value
+### Value Extraction
 
-These methods extract the contained value in an `option<T>` when it contains a value. If the `option` is empty:
-
-- `expect()` throws with a provided custom message
-- `unwrap()` throws with a generic message
-- `unwrap_or()` returns the provided default value
-- `unwrap_or_default()` returns the default value of the type `T`
-- `unwrap_or_else()` returns the result of evaluating the provided function
-- `unwrap_unchecked()` produces undefined behavior if called on `None`
+- `unwrap()`: Extract value, throws if None
+- `expect(msg)`: Throws with custom message if None
+- `unwrap_or(default)`: Returns default if None
+- `unwrap_or_default()`: Returns default-constructed value if None
+- `unwrap_or_else(func)`: Returns result of function if None
+- `unwrap_unchecked()`: Extract without check (undefined if None)
 
 ```cpp
 constexpr auto x = opt::some(std::string("value"));
@@ -186,12 +175,11 @@ static_assert(y.unwrap_or_default() == "");
 static_assert(y.unwrap_or_else([]() { return "computed"sv; }) == "computed"sv);
 ```
 
-### Transforming contained values
+### Conversion to `std::expected`
 
-These methods transform `option` to `std::expected`:
-
-- `ok_or()` transforms an `option` with a value to `std::expected` with that value, and an empty `option` to `std::unexpected` with the provided error value
-- `ok_or_else()` transforms an `option` with a value to `std::expected` with that value, and an empty `option` to `std::unexpected` with the result of the provided function
+- `ok_or(error)`: Converts to `std::expected<T, E>`, or error if None
+- `ok_or_else(func)`: Converts to `std::expected<T, E>`, or result of function if None
+- `transpose()`: Converts `option<std::expected<T, E>>` to `std::expected<option<T>, E>`
 
 ```cpp
 constexpr auto x = opt::some(std::string("foo"));
@@ -203,14 +191,14 @@ constexpr auto w = z.ok_or("error"sv);
 static_assert(w.error() == "error");
 ```
 
-- `transpose()` transposes an `option` of a `std::expected` into a `std::expected` of an `option`
+### Transformation and Mapping
 
-These methods transform the value when present:
-
-- `filter()` calls the provided predicate function on the contained value if present, and returns an `option` with that value if the function returns `true`; otherwise, returns an empty `option`
-- `flatten()` removes one level of nesting from an `option<option<T>>`
-- `inspect()` calls the provided function with the contained value if present, and returns the original `option`
-- `map()` transforms `option<T>` to `option<U>` by applying the provided function to the contained value when present and leaving empty `option`s unchanged
+- `map(func)`: Apply function if value is present, return new `option`
+- `map_or(default, func)`: Apply function if present, else return default
+- `map_or_else(default_func, func)`: Apply function if present, else return result of fallback function
+- `filter(predicate)`: Filter value by predicate
+- `flatten()`: Flatten one level of nested `option<option<T>>`
+- `inspect(func)`: Run side-effect function if value is present, return self
 
 ```cpp
 constexpr auto x = opt::some(4);
@@ -232,10 +220,10 @@ constexpr auto b = a.map([](int x) {
 static_assert(b == opt::some(4));
 ```
 
-These methods transform `option<T>` to a value of a possibly different type `U`:
+These methods convert `option<T>` to another type `U`:
 
-- `map_or()` applies the provided function to the contained value when present, or returns the provided default value if empty
-- `map_or_else()` applies the provided function to the contained value when present, or returns the result of evaluating the provided fallback function if empty
+- `map_or()`: Apply function if present, else return default
+- `map_or_else()`: Apply function if present, else return fallback function result
 
 ```cpp
 constexpr auto x = opt::some(std::string("foo"));
@@ -251,10 +239,11 @@ constexpr auto w = z.map_or(42, [](const std::string &s) {
 static_assert(w == 42);
 ```
 
-These methods combine values from two `option`s:
+### Combination and Unpacking
 
-- `zip()` returns an `option` containing `std::pair(s, o)` if both `option`s contain values; otherwise, returns an empty `option`
-- `zip_with()` calls the provided function and returns an `option` containing `f(s, o)` if both `option`s contain values; otherwise, returns an empty `option`
+- `zip(other)`: If both have value, returns `option<std::pair<T, U>>`
+- `zip_with(other, func)`: If both have value, combine with function
+- `unzip()`: `option<std::pair<T, U>>` to `pair<option<T>, option<U>>`
 
 ```cpp
 constexpr auto x = opt::some("foo"sv);
@@ -265,77 +254,33 @@ constexpr auto z = x.zip_with(y, [](auto a, auto b) {
 });
 static_assert(z == opt::some(false));
 
-
 constexpr auto w = x.zip(y);
 static_assert(w == opt::some(std::pair("foo"sv, "bar"sv)));
 ```
 
-### Boolean operators
+### Boolean Logic Operations
 
-These methods treat the `option` as a boolean value, where a value-containing `option` acts like `true` and an empty `option` acts like `false`. There are two categories of these methods: ones that take an `option` as input, and ones that take a function as input (to be lazily evaluated).
+- `and_(other)`: If value present, return other; else None
+- `or_(other)`: If value present, return self; else other
+- `xor_(other)`: If only one has value, return it; else None
+- `and_then(func)`: If value present, call function and return new `option`
+- `or_else(func)`: If None, call function and return new `option`
 
-The `and_()`, `or_()`, and `xor_()` methods take another `option` as input, and produce an `option` as output:
+### Comparison and Ordering
 
-| method | self | other | output |
-|--------|------|-------|--------|
-| `and_()` | empty | (ignored) | empty |
-| `and_()` | has value(x) | empty | empty |
-| `and_()` | has value(x) | has value(y) | has value(y) |
-| `or_()` | empty | empty | empty |
-| `or_()` | empty | has value(y) | has value(y) |
-| `or_()` | has value(x) | (ignored) | has value(x) |
-| `xor_()` | empty | empty | empty |
-| `xor_()` | empty | has value(y) | has value(y) |
-| `xor_()` | has value(x) | empty | has value(x) |
-| `xor_()` | has value(x) | has value(y) | empty |
-
-```cpp
-constexpr auto x = opt::some(2);
-constexpr auto y = opt::none<int>();
-
-static_assert(x.and_(y).is_none());
-static_assert(x.or_(y).is_some());
-static_assert(x.xor_(y).is_some());
-```
-
-The `and_then()` and `or_else()` methods take a function as input, and only evaluate the function when they need to produce a new value:
-
-| method | self | function input | function output | final output |
-|--------|------|---------------|----------------|--------------|
-| `and_then()` | empty | (not provided) | (not evaluated) | empty |
-| `and_then()` | has value(x) | `x` | empty | empty |
-| `and_then()` | has value(x) | `x` | has value(y) | has value(y) |
-| `or_else()` | empty | (not provided) | empty | empty |
-| `or_else()` | empty | (not provided) | has value(y) | has value(y) |
-| `or_else()` | has value(x) | (not provided) | (not evaluated) | has value(x) |
-
-```cpp
-constexpr auto x = opt::some(2);
-constexpr auto y = x.and_then([](int x) { return opt::some(x * 2); });
-static_assert(y == opt::some(4));
-
-constexpr auto z = opt::none<int>();
-constexpr auto w = z.or_else([]() { return opt::some(42); });
-static_assert(w == opt::some(42));
-```
-
-### Comparison operators
-
-If `T` implements comparison operators, then `option<T>` will derive its comparison implementation. With this order, an empty `option` compares as less than any `option` containing a value, and two value-containing `option`s compare the same way as their contained values would in `T`.
+If `T` supports comparison, so does `option<T>`. None is always less than Some, and Some is compared by value.
 
 ```cpp
 static_assert(opt::none<int>() < opt::some(0));
 static_assert(opt::some(0) < opt::some(1));
 ```
 
-### Modifying an `option` in-place
+### In-place Modification
 
-These methods return a mutable reference to the contained value of an `option<T>`:
-
-- `insert()` inserts a value, dropping any old contents
-- `get_or_insert()` gets the current value, inserting a provided default value if empty
-- `get_or_insert_default()` gets the current value, inserting the default value if empty
-- `get_or_insert_with()` gets the current value, inserting a default computed by the provided function if empty
+- `insert(value)`: Insert new value, discarding old
+- `get_or_insert(value)`: Get current value, or insert default if None
+- `get_or_insert_default()`: Insert default-constructed value if None
+- `get_or_insert_with(func)`: Insert value from function if None
 
 ```cpp
 constexpr auto foo() {
@@ -347,10 +292,10 @@ constexpr auto foo() {
 static_assert(foo() == std::pair{ opt::some(5), 5 });
 ```
 
-These methods transfer ownership of the contained value of an `option`:
+### Ownership Transfer
 
-- `take()` takes ownership of the contained value if any, replacing the `option` with an empty state
-- `replace()` takes ownership of the contained value if any, replacing the `option` with one containing the provided value
+- `take()`: Take value and set to None
+- `replace(value)`: Replace with new value, return old value
 
 ```cpp
 constexpr auto foo() {
@@ -364,7 +309,7 @@ static_assert(foo() == std::pair{ opt::none<int>(), opt::some(2) });
 
 ## Examples
 
-### Initialize a result to `None` before a loop
+### Initialize result as empty `option` before loop
 
 ```cpp
 #include "option.hpp"
@@ -403,7 +348,7 @@ static_assert(name_of_biggest_animal.is_some(), "there are no animals :(");
 static_assert(name_of_biggest_animal.unwrap() == std::string_view("blue whale"), "the biggest animal should be blue whale");
 ```
 
-### Chaining operations with method calls
+### Chaining and Transformation
 
 ```cpp
 #include "option.hpp"
@@ -416,7 +361,7 @@ std::vector<opt::option<int>> options = {
     opt::some(3)
 };
 
-// Collect all some values
+// Collect all present values
 std::vector<int> values;
 for (const auto& opt : options) {
     if (opt.is_some()) {
@@ -425,7 +370,7 @@ for (const auto& opt : options) {
 }
 // [1, 3]
 
-// Transform and filter in a pipeline
+// Pipeline transformation and filtering
 constexpr auto process = [](int x) -> opt::option<int> {
     return opt::some(x)
         .filter([](int y) { return y > 0; })
@@ -435,13 +380,13 @@ constexpr auto process = [](int x) -> opt::option<int> {
 static_assert(process(5) == opt::some(10));
 ```
 
-## Requirements
+## Build Requirements
 
-- C++23 compatible compiler
-- Support for explicit `this` parameters (`__cpp_explicit_this_parameter >= 202110L`)
-- Support for `std::expected` (`__cpp_lib_expected >= 202202L`)
+- C++23 standard support
+- Explicit `this` parameter (`__cpp_explicit_this_parameter >= 202110L`)
+- `std::expected` (`__cpp_lib_expected >= 202202L`)
 
-## Usage
+## Usage Examples
 
 ### Basic Usage
 ```cpp
@@ -466,15 +411,15 @@ std::println("Result: {}", result);
 opt::option<int> value = opt::some(42);
 opt::option<int> empty = opt::none<int>();
 
-// Map operation
+// map operation
 auto doubled = value.map([](int x) { return x * 2; });
 std::println("Doubled: {}", doubled);
 
-// Or_else operation
+// or_else operation
 auto fallback = empty.or_else([]() { return opt::some(99); });
 std::println("Fallback: {}", fallback);
 
-// Chain operations
+// Chaining
 opt::option<int> combined = value.and_then([](int x) { 
     return opt::some(x + 1); 
 });
@@ -484,12 +429,12 @@ std::println("Combined: {}", combined);
 ## Core Methods
 
 ### Creation
-- `opt::some(value)` - create an option containing a value
-- `opt::none<T>()` - create an empty option
+- `opt::some(value)` — Create an option with value
+- `opt::none<T>()` — Create an empty option
 
 ### Typical Use Cases
 ```cpp
-// Function that may fail to find a value
+// Lookup function
 opt::option<std::string> find_user_name(int user_id) {
     if (user_id == 42) {
         return opt::some(std::string("Alice"));
@@ -497,7 +442,7 @@ opt::option<std::string> find_user_name(int user_id) {
     return opt::none<std::string>();
 }
 
-// Parsing that may fail
+// Parse function
 opt::option<int> parse_int(const std::string& str) {
     try {
         return opt::some(std::stoi(str));
@@ -516,71 +461,6 @@ opt::option<T> safe_get(const std::vector<T>& vec, size_t index) {
 }
 ```
 
-### Querying
-- `is_some()` - check if the option contains a value
-- `is_none()` - check if the option is empty
-- `is_some_and(predicate)` - check if the option contains a value that satisfies the predicate
-- `is_none_or(predicate)` - check if the option is empty or the value satisfies the predicate
-
-### Value Extraction
-- `unwrap()` - extract the value, throw if empty
-- `unwrap_or(default)` - extract the value or return a default
-- `unwrap_or_default()` - extract the value or return a default-constructed value
-- `unwrap_or_else(func)` - extract the value or return the result of calling func
-- `expect(message)` - extract the value or throw with a custom message
-- `unwrap_unchecked()` - extract the value without checking (undefined behavior if empty)
-
-### Transformation
-- `map(func)` - transform the contained value
-- `map_or(default, func)` - transform the contained value or return default
-- `map_or_else(default_func, func)` - transform the contained value or call default_func
-- `and_then(func)` - chain operations that return option
-- `filter(predicate)` - filter the value by a predicate
-- `flatten()` - flatten nested options
-
-### Boolean Operations
-- `and_(other)` - return other if this is Some, otherwise None
-- `or_(other)` - return this if this is Some, otherwise other
-- `xor_(other)` - return Some if exactly one of this and other is Some
-- `or_else(func)` - return this if this is Some, otherwise call func
-
-### Conversion
-- `ok_or(error)` - convert to std::expected with error value
-- `ok_or_else(error_func)` - convert to std::expected with error from func
-- `transpose()` - transpose `option<expected<T, E>>` to `expected<option<T>, E>`
-
-### Reference Adapters
-- `as_ref()` - convert to option of const reference
-- `as_mut()` - convert to option of mutable reference
-- `as_deref()` - dereference the contained value
-- `as_deref_mut()` - dereference the contained value mutably
-
-### In-place Modification
-- `insert(value)` - insert value, returning reference to it
-- `get_or_insert(value)` - get current value or insert default
-- `get_or_insert_default()` - get current value or insert T{}
-- `get_or_insert_with(func)` - get current value or insert result of func
-- `take()` - take the contained value, leaving None
-- `replace(value)` - replace the contained value
-
-### Combining Options
-- `zip(other)` - combine two options into option of pair
-- `zip_with(other, func)` - combine two options with a function
-- `unzip()` - split option of pair into pair of options
-
-### Inspection
-- `inspect(func)` - call func with the contained value if Some
-
-### Comparison
-- `cmp(other)` - three-way comparison
-- `eq(other)`, `ne(other)`, `lt(other)`, `le(other)`, `gt(other)`, `ge(other)` - comparison operations
-- `max(other)`, `min(other)` - get maximum/minimum of two options
-- `clamp(min, max)` - clamp option between min and max
-
-### Copying and Cloning
-- `copied()` - create a copy of the option
-- `cloned()` - create a clone of the option (if T has clone() method)
-
 ## License
 
-See LICENSE file.
+See LICENSE file for details.
