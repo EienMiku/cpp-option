@@ -705,7 +705,7 @@ namespace opt {
             if (self.is_some() && other.is_some()) {
                 return self < other ? self : other;
             }
-            return self.is_some() ? self : other;
+            return self.is_none() ? self : other;
         }
 
         constexpr auto min(this auto &&self, option<T> &&other) noexcept(noexcept(self < other))
@@ -714,7 +714,7 @@ namespace opt {
             if (self.is_some() && other.is_some()) {
                 return self < other ? self : std::move(other);
             }
-            return self.is_some() ? self : std::move(other);
+            return self.is_none() ? self : std::move(other);
         }
 
         constexpr auto clamp(this auto &&self, const option<T> &min,
