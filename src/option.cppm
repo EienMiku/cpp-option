@@ -426,7 +426,7 @@ export namespace opt {
             return is_some();
         }
 
-        constexpr operator bool() const noexcept {
+        constexpr explicit operator bool() const noexcept {
             return is_some();
         }
 
