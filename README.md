@@ -587,6 +587,9 @@ xmake run bench_clang --file=xmake.ci.lua
 
 To add new benchmarks, refer to `src/bench.cpp` and ensure benchmark is installed.
 
+![CI Benchmarks](./bench-github-ci.png)
+![Native Clang + MSVC STL Benchmark](./bench-github-clang+msvcstl.png)
+
 ## CI (Continuous Integration)
 
 This project uses GitHub Actions for automated build, test, and benchmark. See `.github/workflows/ci.yml` for details. Main steps:

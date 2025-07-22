@@ -613,6 +613,9 @@ xmake run bench_clang --file=xmake.ci.lua
 
 如需添加新的基准测试，请参考 `src/bench.cpp`，并确保已安装 benchmark。
 
+![CI 基准测试](./bench-github-ci.png)
+![本机 Clang + MSVC STL 基准测试](./bench-github-clang+msvcstl.png)
+
 ## CI 持续集成
 
 本项目已集成 GitHub Actions 自动化流程，支持自动编译、测试和基准运行。CI 配置见 `.github/workflows/ci.yml`，主要流程如下：
