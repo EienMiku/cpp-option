@@ -1,0 +1,67 @@
+name: option CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  gcc-bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GCC 14
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+
+      - name: Install xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+
+      - name: Build and run unit test & benchmark (GCC)
+        run: |
+          xmake f --toolchain=gcc --file=xmake.ci.gcc.lua --yes
+          xmake --yes --file=xmake.ci.gcc.lua
+          xmake run test_unit_gcc
+          xmake run bench_gcc
+
+  clang-bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Clang 20 and libc++
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          sudo apt-get install -y libc++-20-dev libc++abi-20-dev
+
+      - name: Install xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+
+      - name: Build and run unit test & benchmark (Clang/libc++)
+        run: |
+          xmake f --toolchain=clang-20 --file=xmake.ci.clang.lua --yes
+          xmake --yes --file=xmake.ci.clang.lua
+          xmake run test_unit_clang
+          xmake run bench_clang
+
+  # it seems that msvc does not support the ftm of deducing this while cppreference says it is supported
+  # msvc-bench:
+  #   runs-on: windows-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Install xmake
+  #       uses: xmake-io/github-action-setup-xmake@v1
+  #     - name: Build and run unit test & benchmark (MSVC)
+  #       run: |
+  #         xmake require --yes gtest benchmark
+  #         xmake f --toolchain=msvc --file=xmake.ci.windows.lua
+  #         xmake --yes --file=xmake.ci.windows.lua
+  #         xmake run test_unit_msvc
+  #         xmake run bench_msvc

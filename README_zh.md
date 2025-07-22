@@ -24,17 +24,16 @@
 
 opt::option<double> divide(double numerator, double denominator) {
     if (denominator == 0.0) {
-        return opt::none<double>();
+        return opt::none;
     }
     return opt::some(numerator / denominator);
 }
 
-auto result = divide(2.0, 3.0);
-if (result.is_some()) {
-    std::println("结果: {}", result.unwrap());
-} else {
-    std::println("不能除以 0");
-}
+constexpr auto result_1 = divide(2.0, 3.0);
+static_assert(result_1 == opt::some(0.6666666666666666));
+
+constexpr auto result_2 = divide(2.0, 0.0);
+static_assert(result_2 == opt::none);
 ```
 
 ## `option` 与原始指针
@@ -43,6 +42,13 @@ C++ 原始指针可为 null，易导致空指针解引用等未定义行为。`o
 
 ```cpp
 #include "option.hpp"
+
+constexpr auto whatever = 1;
+static_assert(opt::some(&whatever).unwrap() == &whatever);
+
+static_assert(opt::some(&whatever).is_some());
+
+static_assert(opt::some(nullptr).unwrap() == nullptr);
 
 void check_optional(const opt::option<int*>& optional) {
     if (optional.is_some()) {
@@ -53,13 +59,36 @@ void check_optional(const opt::option<int*>& optional) {
 }
 
 int main() {
-    auto optional = opt::none<int*>();
+    auto optional = opt::none_opt<int*>();
     check_optional(optional);
 
     int value = 9000;
     auto optional2 = opt::some(&value);
     check_optional(optional2);
 }
+```
+
+另外，`option` 还支持针对指针的优化，但无法 `constexpr`。可通过定义 `OPT_OPTION_PTR_OPTIMIZATION` 来启用此特性。
+
+```cpp
+#define OPT_OPTION_PTR_OPTIMIZATION
+#include "option.hpp"
+#include <cassert>
+
+auto v     = 0;
+auto opt_1 = opt::some(&v);
+static_assert(sizeof(opt_1) == sizeof(void *));
+
+assert(opt_1.is_some());
+assert(opt_1.unwrap() == &v);
+
+auto opt_2 = opt::some<int *>(nullptr);
+assert(opt_2.is_some());
+assert(opt_2.unwrap() == nullptr);
+
+auto opt_3 = opt::none_opt<int *>();
+assert(opt_3.is_none());
+assert(opt_3 != opt_2);
 ```
 
 
@@ -79,13 +108,13 @@ std::unordered_map<int, std::string> bt = {
 
 auto checked_sub = [](int x, int y) -> opt::option<int> {
     if (x < y)
-        return opt::none<int>();
+        return opt::none;
     return opt::some(x - y);
 };
 
 auto checked_mul = [](int x, int y) -> opt::option<int> {
     if (x > INT_MAX / y)
-        return opt::none<int>();
+        return opt::none;
     return opt::some(x * y);
 };
 
@@ -93,7 +122,7 @@ auto lookup = [](int x) -> opt::option<std::string> {
     auto it = bt.find(x);
     if (it != bt.end())
         return opt::some(it->second);
-    return opt::none<std::string>();
+    return opt::none;
 };
 
 std::vector<int> values = { 0, 1, 11, 200, 22 };
@@ -120,6 +149,10 @@ for (int x : values) {
 - 显式 `this` 参数（deducing this）
 - 与 `std::expected`、`std::pair` 等标准库类型的集成
 
+### 特殊优化
+
+需定义 `OPT_OPTION_PTR_OPTIMIZATION`。
+开启后，对于指针类型，`option` 采用特殊优化存储方式，只使用指针大小的内存。
 
 ## 方法总览
 
@@ -128,200 +161,335 @@ for (int x : values) {
 
 ### 状态查询
 
-`is_some()` / `is_none()`：判断是否有值。
+option 提供多种状态查询方法，便于判断和分支处理：
+- `is_some()`：判断是否有值（返回 `true`/`false`）。
+- `is_none()`：判断是否为空（返回 `true`/`false`）。
+- `is_some_and(pred)`：有值且满足谓词 pred 时返回 `true`，否则返回 `false`。
+- `is_none_or(pred)`：为空或值满足谓词 pred 时返回 `true`，否则返回 `false`。
 
 ```cpp
+// is_some
 constexpr auto x = opt::some(2);
 static_assert(x.is_some());
 
-constexpr auto y = opt::none<int>();
+// is_none
+constexpr auto y = opt::none_opt<int>();
 static_assert(y.is_none());
-```
 
-`is_some_and()` 和 `is_none_or()` 可结合谓词判断：
-
-```cpp
+// is_some_and
 constexpr auto x = opt::some(2);
 static_assert(x.is_some_and([](int x) { return x > 1; }));
 
-constexpr auto y = opt::none<int>();
+// is_none_or
+constexpr auto y = opt::none_opt<int>();
 static_assert(y.is_none_or([](int x) { return x == 2; }));
 ```
 
 
 ### 引用适配器
 
-- `as_ref()`：转为 `option<const T&>`
-- `as_mut()`：转为 `option<T&>`
-- `as_deref()`：解引用后转为 `option<const T::element_type&>`（适用于指针/智能指针等）
-- `as_deref_mut()`：解引用后转为 `option<T::element_type&>`
+option 支持多种引用适配器，便于安全地获取引用或解引用后的可选值：
+- `as_ref()`：转为 `option<const T&>`。
+- `as_mut()`：转为 `option<T&>`。
+- `as_deref()`：若有值则对其解引用，转为 `option<const U&>`，`U` 为 `T` 解引用后的类型。适用于指针 / 智能指针等。
+- `as_deref_mut()`：若有值则对其解引用，转为 `option<U&>`，`U` 为 `T` 解引用后的类型。适用于指针 / 智能指针等。
 
 ```cpp
-constexpr auto x = opt::some(std::string("hello"));
-static_assert(std::same_as<decltype(x.as_ref()), opt::option<const std::string &>>);
+int value = 42;
+opt::option<std::unique_ptr<int>> x = opt::some(std::make_unique<int>(value));
+static_assert(std::same_as<decltype(x.as_deref()), opt::option<const int &>>);
+static_assert(std::same_as<decltype(x.as_deref_mut()), opt::option<int &>>);
+
+opt::option<int *> y = opt::some(&value);
+static_assert(std::same_as<decltype(y.as_deref()), opt::option<const int &>>);
+static_assert(std::same_as<decltype(y.as_deref_mut()), opt::option<int &>>);
 ```
 
 
 ### 提取值
 
-- `unwrap()`：提取值，若为空则抛出异常
-- `expect(msg)`：为空时抛出带自定义消息的异常
-- `unwrap_or(default)`：为空时返回指定默认值
-- `unwrap_or_default()`：为空时返回类型 `T` 的默认值
-- `unwrap_or_else(func)`：为空时返回函数结果
-- `unwrap_unchecked()`：无检查提取（为空时未定义行为）
+option 提供多种安全或灵活的值提取方式，适应不同的错误处理需求：
+- `unwrap()`：提取 option 中的值，若为空则抛出异常（`option_panic`）。
+- `expect(msg)`：与 `unwrap()` 类似，但可自定义异常消息。
+- `unwrap_or(default)`：若有值则返回，否则返回指定默认值。
+- `unwrap_or_default()`：若有值则返回，否则返回类型 `T` 的默认值（需 `T` 可默认构造）。
+- `unwrap_or_else(func)`：若有值则返回，否则调用函数生成返回值。
+- `unwrap_unchecked()`：无检查提取（为空时为未定义行为，仅建议在已知有值时使用）。
 
+示例：
 ```cpp
+// unwrap
 constexpr auto x = opt::some(std::string("value"));
-static_assert(x.expect("should have a value") == "value");
 static_assert(x.unwrap() == "value");
 
-constexpr auto y = opt::none<std::string_view>();
-static_assert(y.unwrap_or("default"sv) == "default"sv);
+// expect
+static_assert(x.expect("必须有值") == "value");
+
+// unwrap_or
+constexpr auto y = opt::none_opt<std::string>();
+constexpr auto default_string = std::string("default");
+static_assert(y.unwrap_or(default_string) == "default");
+
+// unwrap_or_default
 static_assert(y.unwrap_or_default() == "");
-static_assert(y.unwrap_or_else([]() { return "computed"sv; }) == "computed"sv);
+
+// unwrap_or_else
+static_assert(y.unwrap_or_else([] { return std::string("computed"); }) == "computed");
+
+// 注意：unwrap_unchecked() 仅在确定有值时使用，否则为未定义行为
+auto z = opt::some(42);
+int v = z.unwrap_unchecked(); // 安全
+// auto w = opt::none_opt<int>().unwrap_unchecked(); // 未定义行为
 ```
 
 
-### 转换为 `std::expected`
+### 与 `std::expected` 交互
 
-- `ok_or(error)`：有值时转为 `std::expected<T, E>`，为空时转为带错误的 `std::expected<T, E>`
-- `ok_or_else(func)`：有值时转为 `std::expected<T, E>`，为空时转为 `func` 生成的 `std::expected<T, E>`
-- `transpose()`：`option<std::expected<T, E>>` 转为 `std::expected<option<T>, E>`
+option 可与 `std::expected` 互操作，便于错误传播和链式组合：
+- `ok_or(error)`：若有值则转为 `std::expected<T, E>`，否则返回带指定错误的 expected。
+- `ok_or_else(func)`：若有值则转为 expected，否则用函数生成错误。
+- `transpose()`：将 `option<std::expected<T, E>>` 转为 `std::expected<option<T>, E>`，即把 option 的外层和 expected 的外层交换。
 
+示例：
 ```cpp
+// ok_or
 constexpr auto x = opt::some(std::string("foo"));
 constexpr auto y = x.ok_or("error"sv);
-static_assert(y.value() == "foo");
+static_assert(y.has_value() && y.value() == "foo");
 
-constexpr auto z = opt::none<std::string>();
-constexpr auto w = z.ok_or("error"sv);
-static_assert(w.error() == "error");
+constexpr auto z = opt::none_opt<std::string>();
+constexpr auto w = z.ok_or("error info"sv);
+static_assert(!w.has_value() && w.error() == "error info");
+
+// ok_or_else
+constexpr auto err_fn = [] {
+    return std::string("whatever error");
+};
+constexpr auto w2 = z.ok_or_else(err_fn);
+static_assert(!w2.has_value() && w2.error() == "whatever error");
+
+// transpose
+constexpr auto opt_exp = opt::some(std::expected<int, const char *>{ 42 });
+constexpr auto exp_opt = opt_exp.transpose();
+static_assert(exp_opt.has_value() && exp_opt.value() == opt::some(42));
+
+constexpr auto opt_exp2 = opt::some(std::expected<int, const char *>{ std::unexpected("fail") });
+constexpr auto exp_opt2 = opt_exp2.transpose();
+static_assert(!exp_opt2.has_value() && exp_opt2.error() == std::string_view("fail"));
 ```
-
-- `transpose()`：将 `option<std::expected<T, E>>` 转为 `std::expected<option<T>, E>`
-
 
 ### 变换与映射
 
-- `map(func)`：有值时应用函数，返回新 `option`
-- `map_or(default, func)`：有值时应用函数，否则返回默认值
-- `map_or_else(default_func, func)`：有值时应用函数，否则返回回退函数结果
-- `filter(predicate)`：有值时按谓词过滤
-- `flatten()`：展开一层嵌套的 `option<option<T>>`
-- `inspect(func)`：有值时执行副作用函数，返回自身
+option 支持多种变换与映射操作，便于链式处理、类型转换和条件变换：
+- `map(func)`：有值时对值应用函数，返回新 option，否则返回 none。
+- `map_or(default, func)`：有值时应用函数，否则直接返回默认值。
+- `map_or_else(default_func, func)`：有值时应用函数，否则调用 default_func 生成返回值。
+- `filter(predicate)`：有值且满足谓词时保留，否则返回 none。
+- `flatten()`：将 `option<option<T>>` 展开为 `option<T>`。
+- `inspect(func)`：有值时执行副作用函数，返回自身（常用于调试/日志）。
 
+示例：
 ```cpp
+// map
 constexpr auto x = opt::some(4);
-constexpr auto y = x.filter([](int x) {
-    return x > 2;
-});
-static_assert(y == opt::some(4));
+constexpr auto y = x.map([](int v) { return v * 2; });
+static_assert(y == opt::some(8));
 
-constexpr auto z = opt::some(1);
-constexpr auto w = z.filter([](int x) {
-    return x > 2;
-});
-static_assert(w == opt::none<int>());
+constexpr auto z = opt::none_opt<int>();
+constexpr auto w = z.map([](int v) { return v * 2; });
+static_assert(w == opt::none);
 
-constexpr auto a = opt::some(2);
-constexpr auto b = a.map([](int x) {
-    return x * 2;
-});
-static_assert(b == opt::some(4));
-```
+// map_or
+constexpr auto f = opt::some(10);
+constexpr auto r1 = f.map_or(0, [](int v) { return v + 1; });
+static_assert(r1 == 11);
+constexpr auto r2 = opt::none_opt<int>().map_or(0, [](int v) { return v + 1; });
+static_assert(r2 == 0);
 
-这些方法将 `option<T>` 转为其他类型 `U`：
+// map_or_else
+constexpr auto r3 = f.map_or_else([] { return 100; }, [](int v) { return v * 3; });
+static_assert(r3 == 30);
+constexpr auto r4 = opt::none_opt<int>().map_or_else([] { return 100; }, [](int v) { return v * 3; });
+static_assert(r4 == 100);
 
-- `map_or()`：有值时应用函数，否则返回默认值
-- `map_or_else()`：有值时应用函数，否则返回回退函数结果
+// filter
+constexpr auto filtered = opt::some(5).filter([](int v) { return v > 3; });
+static_assert(filtered == opt::some(5));
+constexpr auto filtered2 = opt::some(2).filter([](int v) { return v > 3; });
+static_assert(filtered2 == opt::none);
 
-```cpp
-constexpr auto x = opt::some(std::string("foo"));
-constexpr auto y = x.map_or(42, [](const std::string &s) {
-    return static_cast<int>(s.length());
-});
-static_assert(y == 3);
+// flatten
+constexpr auto nested = opt::some(opt::some(42));
+constexpr auto flat = nested.flatten();
+static_assert(flat == opt::some(42));
 
-constexpr auto z = opt::none<std::string>();
-constexpr auto w = z.map_or(42, [](const std::string &s) {
-    return static_cast<int>(s.length());
-});
-static_assert(w == 42);
+// inspect
+auto log_fn = [](int v) { std::println("got value: {}", v); };
+opt::some(123).inspect(log_fn); // 有值时会输出
 ```
 
 
 ### 组合与解包
 
-- `zip(other)`：两个都有值时返回 `option<std::pair<T, U>>`
-- `zip_with(other, func)`：两个都有值时用函数合并
-- `unzip()`：`option<std::pair<T, U>>` 拆分为 `pair<option<T>, option<U>>`
+option 支持多个 option 之间的组合与解包，便于并行处理、结构化数据和解构：
+- `zip(other)`：若自身和 other 都有值，则返回包含 pair 的 option，否则返回 none。
+- `zip_with(other, func)`：若都为 some，则用 func 合并两个值，返回新 option，否则返回 none。
+- `unzip()`：将 `option<std::pair<T, U>>` 拆分为 `std::pair<option<T>, option<U>>`，即分别提取。
 
+示例：
 ```cpp
-constexpr auto x = opt::some("foo"sv);
-constexpr auto y = opt::some("bar"sv);
+// zip
+constexpr auto a = opt::some(1);
+constexpr auto b = opt::some(2);
+constexpr auto zipped = a.zip(b);
+static_assert(zipped == opt::some(std::pair(1, 2)));
 
-constexpr auto z = x.zip_with(y, [](auto a, auto b) {
-    return a[0] == b[0];
-});
-static_assert(z == opt::some(false));
+constexpr auto none_a = opt::none_opt<int>();
+constexpr auto zipped2 = none_a.zip(b);
+static_assert(zipped2 == opt::none);
 
+constexpr auto s1 = opt::some("foo"sv);
+constexpr auto s2 = opt::some("bar"sv);
+constexpr auto zipped3 = s1.zip_with(s2, [](auto x, auto y) { return x.size() + y.size(); });
+static_assert(zipped3 == opt::some(6zu));
 
-constexpr auto w = x.zip(y);
-static_assert(w == opt::some(std::pair("foo"sv, "bar"sv)));
+// unzip
+constexpr auto pair_opt = opt::some(std::pair(42, "hi"sv));
+constexpr auto unzipped = pair_opt.unzip();
+static_assert(unzipped.first == opt::some(42));
+static_assert(unzipped.second == opt::some("hi"sv));
+
+constexpr auto none_pair = opt::none_opt<std::pair<int, std::string_view>>();
+constexpr auto unzipped2 = none_pair.unzip();
+static_assert(unzipped2.first == opt::none);
+static_assert(unzipped2.second == opt::none);
 ```
 
 
 ### 布尔逻辑操作
 
-- `and_(other)`：有值时返回 `other`，否则返回空 `option`
-- `or_(other)`：有值时返回自身，否则返回 `other`
-- `xor_(other)`：仅有一个为有值时返回有值的 `option`，否则返回空 `option`
-- `and_then(func)`：有值时调用函数，返回新 `option`
-- `or_else(func)`：为空时调用函数，返回新 `option`
+option 提供类似布尔逻辑的组合操作，便于条件判断、链式分支和表达式式控制流：
+- `and_(other)`：若自身有值，返回 other，否则返回 none。
+- `or_(other)`：若自身有值，返回自身，否则返回 other。
+- `xor_(other)`：仅有一个为 some 时返回该值，否则返回 none。
+- `and_then(func)`：有值时调用 func 并返回其结果（常用于链式处理），否则返回 none。
+- `or_else(func)`：为空时调用 func 并返回其结果，否则返回自身。
+
+示例：
+```cpp
+constexpr auto a = opt::some(1);
+constexpr auto b = opt::some(2);
+constexpr auto n = opt::none_opt<int>();
+
+// and_
+static_assert(a.and_(b) == b);
+static_assert(n.and_(b) == opt::none);
+
+// or_
+static_assert(a.or_(b) == a);
+static_assert(n.or_(b) == b);
+
+// xor_
+static_assert(a.xor_(n) == a);
+static_assert(n.xor_(b) == b);
+static_assert(a.xor_(b) == opt::none);
+static_assert(n.xor_(n) == opt::none);
+
+// and_then
+constexpr auto f = [](int x) { return opt::some(x * 10); };
+static_assert(a.and_then(f) == opt::some(10));
+static_assert(n.and_then(f) == opt::none);
+
+// or_else
+constexpr auto g = [] { return opt::some(99); };
+static_assert(a.or_else(g) == a);
+static_assert(n.or_else(g) == opt::some(99));
+```
 
 
 ### 比较与排序
 
-若 `T` 支持比较，`option<T>` 也支持。空的 `option` 总小于有值的 `option`，有值时按值比较。
+若 `T` 支持比较，`option<T>` 也支持所有标准比较操作。规则如下：
+- 空的 option（none）总是小于有值的 option（some）。
+- 两个 some 时按值比较。
+- 支持 `<`, `<=`, `>`, `>=`, `==`, `!=` 以及三路比较（`<=>`）。
 
+示例：
 ```cpp
-static_assert(opt::none<int>() < opt::some(0));
+static_assert(opt::none < opt::some(0));
 static_assert(opt::some(0) < opt::some(1));
+static_assert(opt::some(1) > opt::none);
+static_assert(opt::some(1) == opt::some(1));
+static_assert(opt::none == opt::none);
+static_assert((opt::some(1) <=> opt::none) == std::strong_ordering::greater);
 ```
 
 
 ### 就地修改
 
-- `insert(value)`：插入新值，丢弃旧值
-- `get_or_insert(value)`：获取当前值，若为空则插入默认值
-- `get_or_insert_default()`：为空则插入类型默认值
-- `get_or_insert_with(func)`：为空则插入函数生成的值
+option 支持原地修改和懒惰初始化，便于高效管理可选值：
+- `insert(value)`：直接插入新值，覆盖原有内容。
+- `get_or_insert(value)`：若已有值则返回引用，否则插入 value 并返回引用。
+- `get_or_insert_default()`：若为空则插入类型默认值（需 T 可默认构造），返回引用。
+- `get_or_insert_with(func)`：若为空则调用 func 生成值插入，返回引用。
 
+示例：
 ```cpp
-constexpr auto foo() {
-    auto x  = opt::none<int>();
-    auto &y = x.get_or_insert(5);
-    return std::pair{ x, y };
+// insert
+constexpr auto ins() {
+    opt::option<int> x = opt::none;
+    x.insert(123);
+    return x;
 }
+static_assert(ins() == opt::some(123));
 
-static_assert(foo() == std::pair{ opt::some(5), 5 });
+// get_or_insert
+constexpr auto bar() {
+    opt::option<int> n = opt::none;
+    int &ref           = n.get_or_insert(42);
+    return std::pair{ n, ref };
+}
+static_assert(bar() == std::pair{ opt::some(42), 42 });
+
+// get_or_insert_default
+constexpr auto baz() {
+    opt::option<int> n = opt::none;
+    int &ref           = n.get_or_insert_default();
+    return std::pair{ n, ref };
+}
+static_assert(baz() == std::pair{ opt::some(0), 0 });
+
+// get_or_insert_with
+constexpr auto with() {
+    opt::option<int> x = opt::none;
+    int &ref           = x.get_or_insert_with([] { return 77; });
+    return std::pair{ x, ref };
+}
+static_assert(with() == std::pair{ opt::some(77), 77 });
 ```
 
 
 ### 所有权转移
 
-- `take()`：取出值并置空
-- `replace(value)`：替换为新值，返回旧值
+option 支持安全的所有权转移操作，便于值的移动和重置：
+- `take()`：取出当前值并将自身置空，返回原值的 option。
+- `replace(value)`：用新值替换当前值，返回原值的 option。
 
+示例：
 ```cpp
 constexpr auto foo() {
     auto x = opt::some(2);
     auto y = x.take();
     return std::pair{ x, y };
 }
+static_assert(foo() == std::pair{ opt::none, opt::some(2) });
 
-static_assert(foo() == std::pair{ opt::none<int>(), opt::some(2) });
+constexpr auto bar() {
+    auto s = opt::some("abc"s);
+    auto old = s.replace("xyz");
+    return std::pair{ s, old };
+}
+static_assert(bar() == std::pair{ opt::some("xyz"s), opt::some("abc"s) });
 ```
 
 
@@ -330,8 +498,6 @@ static_assert(foo() == std::pair{ opt::none<int>(), opt::some(2) });
 ### 在循环前初始化结果为空 `option`
 
 ```cpp
-#include "option.hpp"
-
 enum class Kingdom { Plant, Animal };
 
 struct BigThing {
@@ -340,19 +506,21 @@ struct BigThing {
     std::string_view name;
 };
 
-constexpr std::array<BigThing, 6> all_the_big_things = {{
-    { Kingdom::Plant,  250, std::string_view("redwood") },
-    { Kingdom::Plant,  230, std::string_view("noble fir") },
-    { Kingdom::Plant,  229, std::string_view("sugar pine") },
-    { Kingdom::Animal, 25,  std::string_view("blue whale") },
-    { Kingdom::Animal, 19,  std::string_view("fin whale") },
-    { Kingdom::Animal, 15,  std::string_view("north pacific right whale") },
-}};
+constexpr std::array<BigThing, 6> all_the_big_things = {
+    {
+     { Kingdom::Plant, 250, std::string_view("redwood") },
+     { Kingdom::Plant, 230, std::string_view("noble fir") },
+     { Kingdom::Plant, 229, std::string_view("sugar pine") },
+     { Kingdom::Animal, 25, std::string_view("blue whale") },
+     { Kingdom::Animal, 19, std::string_view("fin whale") },
+     { Kingdom::Animal, 15, std::string_view("north pacific right whale") },
+     }
+};
 
 constexpr opt::option<std::string_view> find_biggest_animal_name() {
-    int max_size = 0;
-    opt::option<std::string_view> max_name = opt::none<std::string_view>();
-    for (const auto& thing : all_the_big_things) {
+    int max_size                           = 0;
+    opt::option<std::string_view> max_name = opt::none;
+    for (const auto &thing : all_the_big_things) {
         if (thing.kind == Kingdom::Animal && thing.size > max_size) {
             max_size = thing.size;
             max_name = opt::some(thing.name);
@@ -363,7 +531,8 @@ constexpr opt::option<std::string_view> find_biggest_animal_name() {
 
 constexpr auto name_of_biggest_animal = find_biggest_animal_name();
 static_assert(name_of_biggest_animal.is_some(), "there are no animals :(");
-static_assert(name_of_biggest_animal.unwrap() == std::string_view("blue whale"), "the biggest animal should be blue whale");
+static_assert(name_of_biggest_animal.unwrap() == std::string_view("blue whale"),
+              "the biggest animal should be blue whale");
 ```
 
 
@@ -376,11 +545,11 @@ static_assert(name_of_biggest_animal.unwrap() == std::string_view("blue whale"),
 
 std::vector<opt::option<int>> options = {
     opt::some(1), 
-    opt::none<int>(), 
+    opt::none, 
     opt::some(3)
 };
 
-// 收集所有有值的项
+// 收集所有有值的项，我没想到比较好的 constexpr 例子
 std::vector<int> values;
 for (const auto& opt : options) {
     if (opt.is_some()) {
@@ -399,6 +568,66 @@ constexpr auto process = [](int x) -> opt::option<int> {
 static_assert(process(5) == opt::some(10));
 ```
 
+## 安装
+
+本库为头文件库 / 模块库，支持多种集成方式：
+
+- **头文件方式**：直接复制 `src/include/option.hpp` 到你的项目，并在代码中 `#include "option.hpp"`。
+- **模块方式**：复制 `src/option.cppm` 到你的项目，并在代码中 `import option;`。注意需编译器支持模块和标准库模块。
+
+## 测试与基准
+
+### 单元测试（gtest）
+
+本项目内置了基于 [GoogleTest](https://github.com/google/googletest) 的单元测试，测试文件为 `src/test_unit.cpp`。
+
+支持三大主流编译器（GCC、Clang、MSVC），分别对应 target：
+
+- GCC: `test_unit_gcc`
+- Clang: `test_unit_clang`
+- MSVC: `test_unit_msvc`
+
+可通过如下命令编译并运行（以 GCC 为例）：
+
+```sh
+xmake run test_unit_gcc --file=xmake.ci.lua
+```
+
+如需自定义或扩展测试，请参考 `src/test_unit.cpp`，并确保已安装 gtest。
+
+### 性能基准（benchmark）
+
+性能测试基于 [Google Benchmark](https://github.com/google/benchmark)，主文件为 `src/bench.cpp`。
+
+同样支持三大主流编译器，分别对应 target：
+
+- GCC: `bench_gcc`
+- Clang: `bench_clang`
+- MSVC: `bench_msvc`
+
+可通过如下命令编译并运行（以 Clang 为例）：
+
+```sh
+xmake run bench_clang --file=xmake.ci.lua
+```
+
+如需添加新的基准测试，请参考 `src/bench.cpp`，并确保已安装 benchmark。
+
+## CI 持续集成
+
+本项目已集成 GitHub Actions 自动化流程，支持自动编译、测试和基准运行。CI 配置见 `.github/workflows/ci.yml`，主要流程如下：
+
+1. 安装编译器和 xmake
+2. 编译所有目标（包括测试和基准）
+3. 自动运行单元测试
+
+如需本地模拟 CI 流程，可直接运行：
+
+```sh
+xmake --yes --file=xmake.ci.lua
+xmake run test_unit --file=xmake.ci.lua
+xmake run bench --file=xmake.ci.lua
+```
 
 ## 编译要求
 
@@ -410,11 +639,10 @@ static_assert(process(5) == opt::some(10));
 ## 用法示例
 
 ### 基本用法
-```cpp
-#include "option.hpp"
 
+```cpp
 opt::option<int> value = opt::some(42);
-opt::option<int> empty = opt::none<int>();
+opt::option<int> empty = opt::none;
 
 if (value.is_some()) {
     int x = value.unwrap();
@@ -426,11 +654,10 @@ std::println("结果: {}", result);
 ```
 
 ### 高级用法
-```cpp
-#include "option.hpp"
 
+```cpp
 opt::option<int> value = opt::some(42);
-opt::option<int> empty = opt::none<int>();
+opt::option<int> empty = opt::none;
 
 // map 操作
 auto doubled = value.map([](int x) { return x * 2; });
@@ -451,7 +678,8 @@ std::println("组合: {}", combined);
 
 ### 创建
 - `opt::some(value)` —— 创建包含值的 option
-- `opt::none<T>()` —— 创建空 option
+- `opt::none` —— 空 option
+- `opt::none_opt<T>()` —— 创建类型为 T 的空 option
 
 ### 典型用例
 ```cpp
@@ -460,7 +688,7 @@ opt::option<std::string> find_user_name(int user_id) {
     if (user_id == 42) {
         return opt::some(std::string("Alice"));
     }
-    return opt::none<std::string>();
+    return opt::none;
 }
 
 // 解析函数
@@ -468,7 +696,7 @@ opt::option<int> parse_int(const std::string& str) {
     try {
         return opt::some(std::stoi(str));
     } catch (...) {
-        return opt::none<int>();
+        return opt::none;
     }
 }
 
@@ -478,7 +706,7 @@ opt::option<T> safe_get(const std::vector<T>& vec, size_t index) {
     if (index < vec.size()) {
         return opt::some(vec[index]);
     }
-    return opt::none<T>();
+    return opt::none;
 }
 ```
 
