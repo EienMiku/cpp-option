@@ -3,8 +3,22 @@ add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
 
 set_languages("c++latest")
 
-add_requires("gtest", {system = false})
-add_requires("benchmark", {system = false})
+add_requires("gtest", {
+    configs = {
+        cxx_compiler = "clang++-20",
+        cxxflags = "-stdlib=libc++",
+        ldflags = "-stdlib=libc++"
+    },
+    system = false
+})
+add_requires("benchmark", {
+    configs = {
+        cxx_compiler = "clang++-20",
+        cxxflags = "-stdlib=libc++",
+        ldflags = "-stdlib=libc++"
+    },
+    system = false
+})
 
 -- Clang (libc++) test
 
