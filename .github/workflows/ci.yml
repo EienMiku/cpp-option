@@ -24,6 +24,7 @@ jobs:
 
       - name: Build and run unit test & benchmark (GCC)
         run: |
+          xmake config --mode=release
           xmake f --toolchain=gcc --file=xmake.ci.gcc.lua --yes
           xmake --yes --file=xmake.ci.gcc.lua
           xmake run test_unit_gcc
@@ -46,6 +47,7 @@ jobs:
 
       - name: Build and run unit test & benchmark (Clang/libc++)
         run: |
+          xmake config --mode=release
           xmake f --toolchain=clang-20 --file=xmake.ci.clang.lua --yes
           xmake --yes --file=xmake.ci.clang.lua
           xmake run test_unit_clang
