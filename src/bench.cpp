@@ -1,3 +1,4 @@
+// NOLINTBEGIN
 #include "option.hpp"
 #include <benchmark/benchmark.h>
 #include <optional>
@@ -255,4 +256,86 @@ static void BM_std_optional_vector_move(benchmark::State &state) {
 }
 BENCHMARK_EX(BM_std_optional_vector_move);
 
+static void BM_opt_option_and(benchmark::State &state) {
+    long sum = 0;
+    for (auto _ : state) {
+        for (int i = 0; i < 1000000; ++i) {
+            opt::option<int> o1 = (i % 2 == 0) ? opt::some(i) : opt::none;
+            opt::option<int> o2 = (i % 3 == 0) ? opt::some(i * 2) : opt::none;
+            sum += o1.and_(o2).unwrap_or(0);
+        }
+    }
+    benchmark::DoNotOptimize(sum);
+}
+BENCHMARK_EX(BM_opt_option_and);
+
+static void BM_std_optional_and(benchmark::State &state) {
+    long sum = 0;
+    for (auto _ : state) {
+        for (int i = 0; i < 1000000; ++i) {
+            std::optional<int> o1 = (i % 2 == 0) ? std::optional<int>(i) : std::nullopt;
+            std::optional<int> o2 = (i % 3 == 0) ? std::optional<int>(i * 2) : std::nullopt;
+            auto result           = (o1.has_value() && o2.has_value()) ? o2 : std::optional<int>{};
+            sum += result.value_or(0);
+        }
+    }
+    benchmark::DoNotOptimize(sum);
+}
+BENCHMARK_EX(BM_std_optional_and);
+
+static void BM_opt_option_or(benchmark::State &state) {
+    long sum = 0;
+    for (auto _ : state) {
+        for (int i = 0; i < 1000000; ++i) {
+            opt::option<int> o1 = (i % 2 == 0) ? opt::some(i) : opt::none;
+            opt::option<int> o2 = (i % 3 == 0) ? opt::some(i * 2) : opt::none;
+            sum += o1.or_(o2).unwrap_or(0);
+        }
+    }
+    benchmark::DoNotOptimize(sum);
+}
+BENCHMARK_EX(BM_opt_option_or);
+
+static void BM_std_optional_or(benchmark::State &state) {
+    long sum = 0;
+    for (auto _ : state) {
+        for (int i = 0; i < 1000000; ++i) {
+            std::optional<int> o1 = (i % 2 == 0) ? std::optional<int>(i) : std::nullopt;
+            std::optional<int> o2 = (i % 3 == 0) ? std::optional<int>(i * 2) : std::nullopt;
+            auto result           = o1.has_value() ? o1 : o2;
+            sum += result.value_or(0);
+        }
+    }
+    benchmark::DoNotOptimize(sum);
+}
+BENCHMARK_EX(BM_std_optional_or);
+
+static void BM_opt_option_xor(benchmark::State &state) {
+    long sum = 0;
+    for (auto _ : state) {
+        for (int i = 0; i < 1000000; ++i) {
+            opt::option<int> o1 = (i % 2 == 0) ? opt::some(i) : opt::none;
+            opt::option<int> o2 = (i % 3 == 0) ? opt::some(i * 2) : opt::none;
+            sum += o1.xor_(o2).unwrap_or(0);
+        }
+    }
+    benchmark::DoNotOptimize(sum);
+}
+BENCHMARK_EX(BM_opt_option_xor);
+
+static void BM_std_optional_xor(benchmark::State &state) {
+    long sum = 0;
+    for (auto _ : state) {
+        for (int i = 0; i < 1000000; ++i) {
+            std::optional<int> o1 = (i % 2 == 0) ? std::optional<int>(i) : std::nullopt;
+            std::optional<int> o2 = (i % 3 == 0) ? std::optional<int>(i * 2) : std::nullopt;
+            auto result = (o1.has_value() != o2.has_value()) ? (o1.has_value() ? o1 : o2) : std::optional<int>{};
+            sum += result.value_or(0);
+        }
+    }
+    benchmark::DoNotOptimize(sum);
+}
+BENCHMARK_EX(BM_std_optional_xor);
+
 BENCHMARK_MAIN();
+// NOLINTEND
