@@ -9,24 +9,26 @@ on:
 jobs:
   gcc-bench:
     runs-on: ubuntu-latest
+    container:
+      image: gcc:15
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install GCC 15 (from toolchain PPA)
+      
+      - name: Install dependencies and xmake
         run: |
-          sudo apt-get update
-          # Add Ubuntu toolchain test PPA for latest GCC versions
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-          sudo apt-get update
-          sudo apt-get install -y gcc-15 g++-15
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
-
-      - name: Install xmake
-        uses: xmake-io/github-action-setup-xmake@v1
+          apt-get update
+          apt-get install -y wget curl unzip git python3 python3-pip
+          gcc --version
+          g++ --version
+          # Install xmake manually
+          bash <(curl -fsSL https://xmake.io/shget.text)
+          echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
+          export PATH="/root/.local/bin:$PATH"
+          xmake --version
 
       - name: Build and run unit test & benchmark (GCC)
         run: |
+          export PATH="/root/.local/bin:$PATH"
           xmake config --mode=release
           xmake f --toolchain=gcc --file=xmake.ci.gcc.lua --yes
           xmake --yes --file=xmake.ci.gcc.lua
