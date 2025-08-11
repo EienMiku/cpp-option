@@ -1966,14 +1966,9 @@ namespace opt {
             }
         }
         
-        // Copy trait - indicates that a type implements bitwise copy semantics
-        // In Rust, Copy types are implicitly cloned and don't have destructors that do work
-        // In C++, this roughly corresponds to trivially copyable types
         constexpr auto copy(this auto &&self) noexcept
             requires std::is_trivially_copyable_v<T>
         {
-            // For trivially copyable types, we can just use the copy constructor
-            // These types typically represent "plain old data" or simple value types
             return option{ self };
         }
 
