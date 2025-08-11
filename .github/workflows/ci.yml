@@ -21,14 +21,13 @@ jobs:
           gcc --version
           g++ --version
           # Install xmake manually
-          bash <(curl -fsSL https://xmake.io/shget.text)
-          echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
-          export PATH="/root/.local/bin:$PATH"
+          curl -fsSL https://xmake.io/shget.text | bash
+          source ~/.xmake/profile
           xmake --version
 
       - name: Build and run unit test & benchmark (GCC)
         run: |
-          export PATH="/root/.local/bin:$PATH"
+          source ~/.xmake/profile
           xmake config --mode=release
           xmake f --toolchain=gcc --file=xmake.ci.gcc.lua --yes
           xmake --yes --file=xmake.ci.gcc.lua
