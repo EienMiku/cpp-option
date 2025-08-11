@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: gcc:15
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       
