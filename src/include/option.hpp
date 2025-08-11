@@ -1943,37 +1943,30 @@ namespace opt {
             return option{};
         }
 
-        constexpr void clone_from(this auto &&self, const option<T> &source)
+        constexpr void clone_from(this auto &&self, const option<T> &source) noexcept(detail::noexcept_cloneable<T>)
             requires detail::cloneable<T> && std::is_copy_assignable_v<T>
         {
             if (source.is_some()) {
                 if (self.is_some()) {
-                    // Reuse existing storage - use clone_value for proper cloning
                     if constexpr (detail::has_clone<T>) {
-                        // If T has clone method, we need to assign the result
                         self.storage.get() = detail::clone_value(source.unwrap_unchecked());
                     } else {
-                        // For other types, direct assignment works
                         self.storage.get() = source.unwrap_unchecked();
                     }
                 } else {
-                    // Need to construct new value
                     self.emplace(detail::clone_value(source.unwrap_unchecked()));
                 }
             } else {
-                // Source is empty, make self empty too
                 self.reset();
             }
         }
-        
-        constexpr auto copy(this auto &&self) noexcept
+
+        constexpr auto copy(this auto &&self) noexcept(std::is_nothrow_copy_constructible_v<T>)
             requires std::is_trivially_copyable_v<T>
         {
             return option{ self };
         }
 
-        // Returns an empty option.
-        // Not recommended, use `{}`, `none`, or `none_opt` instead.
         static constexpr auto default_() noexcept {
             return option{};
         }
