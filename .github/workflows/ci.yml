@@ -39,6 +39,20 @@ jobs:
           xmake run test_unit_gcc
           xmake run bench_gcc
 
+      - name: List build outputs
+        run: |
+          find build -name "*gcc*" -type f || true
+          ls -la build/ || true
+
+      - name: Upload GCC artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcc-binaries
+          path: |
+            build/linux/*/release/bench_gcc
+            build/linux/*/release/test_unit_gcc
+          if-no-files-found: warn
+
   clang-bench:
     runs-on: ubuntu-latest
     steps:
@@ -61,6 +75,20 @@ jobs:
           xmake --yes --file=xmake.ci.clang.lua
           xmake run test_unit_clang
           xmake run bench_clang
+
+      - name: List build outputs
+        run: |
+          find build -name "*clang*" -type f || true
+          ls -la build/ || true
+
+      - name: Upload Clang artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-binaries
+          path: |
+            build/linux/*/release/bench_clang
+            build/linux/*/release/test_unit_clang
+          if-no-files-found: warn
 
   # it seems that msvc does not support the ftm of deducing this while cppreference says it is supported
   # msvc-bench:
