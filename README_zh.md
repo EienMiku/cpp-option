@@ -149,7 +149,7 @@ static_assert(x.is_some());
 
 // is_none
 constexpr opt::option<int> y = opt::none;
-// constexpr auto y = opt::none_opt<int>;
+// constexpr auto y = opt::none_opt<int>();
 static_assert(y.is_none());
 
 // is_some_and
@@ -270,7 +270,7 @@ constexpr auto x = opt::some("foo"s);
 constexpr auto y = x.ok_or("error"sv);
 static_assert(y.has_value() && y.value() == "foo");
 
-constexpr auto z = opt::none_opt<std::string>;
+constexpr auto z = opt::none_opt<std::string>();
 constexpr auto w = z.ok_or("error info"sv);
 static_assert(!w.has_value() && w.error() == "error info");
 
@@ -361,7 +361,7 @@ constexpr auto b = opt::some(2);
 constexpr auto zipped = a.zip(b);
 static_assert(zipped == opt::some(std::pair{ 1, 2 }));
 
-constexpr auto none_a = opt::none_opt<int>;
+constexpr auto none_a = opt::none_opt<int>();
 constexpr auto zipped2 = none_a.zip(b);
 static_assert(zipped2 == opt::none);
 
@@ -376,7 +376,7 @@ constexpr auto unzipped = pair_opt.unzip();
 static_assert(unzipped.first == opt::some(42));
 static_assert(unzipped.second == opt::some("hi"sv));
 
-constexpr auto none_pair = opt::none_opt<std::pair<int, std::string_view>>;
+constexpr auto none_pair = opt::none_opt<std::pair<int, std::string_view>>();
 constexpr auto unzipped2 = none_pair.unzip();
 static_assert(unzipped2.first == opt::none);
 static_assert(unzipped2.second == opt::none);
@@ -395,7 +395,7 @@ static_assert(unzipped2.second == opt::none);
 ```cpp
 constexpr auto a = opt::some(1);
 constexpr auto b = opt::some(2);
-constexpr auto n = opt::none_opt<int>;
+constexpr auto n = opt::none_opt<int>();
 
 // and_
 static_assert(a.and_(b) == b);
@@ -744,7 +744,7 @@ std::println("组合: {}", combined);
 ### 创建
 - `opt::some(value)` —— 创建包含值的 option
 - `opt::none` —— 空 option
-- `opt::none_opt<T>` —— 创建类型为 T 的空 option
+- `opt::none_opt<T>()` —— 创建类型为 T 的空 option
 
 ### 典型用例
 ```cpp
