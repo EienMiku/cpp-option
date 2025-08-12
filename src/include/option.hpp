@@ -3176,7 +3176,7 @@ namespace opt {
     }
 
     template <typename T>
-    inline constexpr option<T> none_opt{};
+    inline constexpr option<T> none_opt{ none };
 
     template <typename T>
         requires (!detail::specialization_of<std::optional, T>)
