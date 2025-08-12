@@ -1,9 +1,9 @@
-#include <compare>
 #define OPTION_HPP
 
 #pragma once
 
 #include <cassert>
+#include <compare>
 #include <concepts>
 #include <exception>
 #include <expected>
@@ -125,6 +125,7 @@ namespace opt {
             }
             return T{};
         }
+
         template <detail::option_type T>
         constexpr auto xor_(T &&optb) const noexcept {
             if (optb.is_some()) {
@@ -166,7 +167,7 @@ namespace opt {
                 requires std::copy_constructible<T> && (!std::is_trivially_copy_constructible_v<T>)
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
-                    new (&value) T(other.value);
+                    std::construct_at(&value, other.value);
                 }
             }
 
@@ -178,7 +179,7 @@ namespace opt {
                 requires std::move_constructible<T> && (!std::is_trivially_move_constructible_v<T>)
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
-                    new (&value) T(std::move(other.value));
+                    std::construct_at(&value, std::move(other.value));
                     other.has_value_ = false;
                 }
             }
@@ -199,7 +200,7 @@ namespace opt {
                     }
                     has_value_ = other.has_value_;
                     if (has_value_) {
-                        new (&value) T(other.value);
+                        std::construct_at(&value, other.value);
                     }
                 }
                 return *this;
@@ -221,7 +222,7 @@ namespace opt {
                     }
                     has_value_ = other.has_value_;
                     if (has_value_) {
-                        new (&value) T(std::move(other.value));
+                        std::construct_at(&value, std::move(other.value));
                         other.has_value_ = false;
                     }
                 }
@@ -270,7 +271,7 @@ namespace opt {
                         value.T::~T();
                     }
                 }
-                new (&value) T(std::forward<Ts>(args)...);
+                std::construct_at(&value, std::forward<Ts>(args)...);
                 has_value_ = true;
             }
 
@@ -282,7 +283,7 @@ namespace opt {
                         value.T::~T();
                     }
                 }
-                new (&value) T(il, std::forward<Ts>(args)...);
+                std::construct_at(&value, il, std::forward<Ts>(args)...);
                 has_value_ = true;
             }
         };
