@@ -37,7 +37,11 @@ jobs:
           xmake f --toolchain=gcc --file=xmake.ci.gcc.lua --yes
           xmake --yes --file=xmake.ci.gcc.lua
           xmake run test_unit_gcc
+          # Disable ASLR for benchmark to reduce noise
+          echo 0 > /proc/sys/kernel/randomize_va_space 2>/dev/null || echo "Could not disable ASLR"
           xmake run bench_gcc
+          # Re-enable ASLR
+          echo 2 > /proc/sys/kernel/randomize_va_space 2>/dev/null || echo "Could not re-enable ASLR"
 
       - name: List build outputs
         run: |
@@ -74,7 +78,11 @@ jobs:
           xmake f --toolchain=clang-20 --file=xmake.ci.clang.lua --yes
           xmake --yes --file=xmake.ci.clang.lua
           xmake run test_unit_clang
+          # Disable ASLR for benchmark to reduce noise
+          echo 0 | sudo tee /proc/sys/kernel/randomize_va_space >/dev/null 2>&1 || echo "Could not disable ASLR"
           xmake run bench_clang
+          # Re-enable ASLR
+          echo 2 | sudo tee /proc/sys/kernel/randomize_va_space >/dev/null 2>&1 || echo "Could not re-enable ASLR"
 
       - name: List build outputs
         run: |
