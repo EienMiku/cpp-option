@@ -175,7 +175,7 @@ TEST(OptionBasic, PointerAdapter) {
 
     // Test none_opt<T*>()
     {
-        auto opt_none = none_opt<int *>();
+        auto opt_none = none_opt<int *>;
         EXPECT_TRUE(opt_none.is_none());
     }
 }
@@ -270,7 +270,7 @@ TEST(OptionEdge, PointerNullAndSentinel) {
     int v   = 1;
     auto o1 = some(&v);
     auto o2 = some<int *>(nullptr);
-    auto o3 = none_opt<int *>();
+    auto o3 = none_opt<int *>;
     EXPECT_TRUE(o1.is_some());
     EXPECT_EQ(o1.unwrap(), &v);
     EXPECT_TRUE(o2.is_some());
@@ -459,7 +459,7 @@ TEST(OptionEdge, XorZipWith) {
 TEST(OptionEdge, StaticMakeOptionNoneOpt) {
     auto a = make_option(1);
     EXPECT_EQ(a, some(1));
-    auto b = none_opt<double>();
+    auto b = none_opt<double>;
     EXPECT_TRUE(b.is_none());
 }
 
@@ -536,7 +536,7 @@ TEST(OptionAPI, PointerEdge) {
     int v                 = 7;
     opt::option<int *> o1 = opt::some(&v);
     opt::option<int *> o2 = opt::some<int *>(nullptr);
-    opt::option<int *> o3 = opt::none_opt<int *>();
+    opt::option<int *> o3 = opt::none_opt<int *>;
     EXPECT_TRUE(o1.is_some());
     EXPECT_TRUE(o2.is_some());
     EXPECT_TRUE(o3.is_none());
@@ -665,7 +665,7 @@ TEST(OptionAPI, CompareAll) {
 TEST(OptionAPI, StaticMakeOptionNoneOpt) {
     auto a = opt::make_option(1);
     EXPECT_EQ(a, opt::some(1));
-    auto b = opt::none_opt<double>();
+    auto b = opt::none_opt<double>;
     EXPECT_TRUE(b.is_none());
 }
 
@@ -730,7 +730,7 @@ constexpr opt::option<int> constexpr_some() {
     return opt::some(123);
 }
 constexpr opt::option<int> constexpr_none() {
-    return opt::none_opt<int>();
+    return opt::none_opt<int>;
 }
 static_assert(constexpr_some().is_some());
 static_assert(constexpr_none().is_none());

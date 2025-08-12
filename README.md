@@ -21,7 +21,7 @@ With `option`, you can explicitly handle the presence or absence of a value, avo
 ```cpp
 #include "option.hpp"
 
-opt::option<double> divide(double numerator, double denominator) {
+constexpr opt::option<double> divide(double numerator, double denominator) {
     if (denominator == 0.0) {
         return opt::none;
     }
@@ -34,6 +34,10 @@ static_assert(result_1 == opt::some(0.6666666666666666));
 constexpr auto result_2 = divide(2.0, 0.0);
 static_assert(result_2 == opt::none);
 ```
+
+## Compatibility with Standard Library
+
+`opt::option` is **fully compatible** with the C++26 draft `std::optional`, but some member functions may change the returned `std::optional` to `opt::option`. You can completely replace `std::optional` with `opt::option` and enjoy richer features and possibly better performance.
 
 ## `option` and Raw Pointers
 
@@ -58,36 +62,13 @@ void check_optional(const opt::option<int*>& optional) {
 }
 
 int main() {
-    auto optional = opt::none_opt<int*>();
+    auto optional = opt::none;
     check_optional(optional);
 
     int value = 9000;
     auto optional2 = opt::some(&value);
     check_optional(optional2);
 }
-```
-
-Additionally, `option` supports pointer optimization (cannot `constexpr`). Define `OPT_OPTION_PTR_OPTIMIZATION` to enable this feature.
-
-```cpp
-#define OPT_OPTION_PTR_OPTIMIZATION
-#include "option.hpp"
-#include <cassert>
-
-auto v     = 0;
-auto opt_1 = opt::some(&v);
-static_assert(sizeof(opt_1) == sizeof(void *));
-
-assert(opt_1.is_some());
-assert(opt_1.unwrap() == &v);
-
-auto opt_2 = opt::some<int *>(nullptr);
-assert(opt_2.is_some());
-assert(opt_2.unwrap() == nullptr);
-
-auto opt_3 = opt::none_opt<int *>();
-assert(opt_3.is_none());
-assert(opt_3 != opt_2);
 ```
 
 ## Error Handling and Chaining
@@ -139,16 +120,12 @@ for (int x : values) {
 
 ## Implementation Notes
 
-This library uses a union-based storage mechanism, supporting value types, reference types (as pointers), and `void` (presence only), combining Rust `Option` semantics with C++23 features:
+This library uses a union-based storage mechanism, supporting value types, reference types (implemented with pointers), and `void` (presence only), combining Rust `Option` semantics with C++26 features:
 
 - Complete move/copy semantics and perfect forwarding
 - Extensive `constexpr` support
 - Explicit `this` parameter (deducing this)
 - Integration with standard types like `std::expected`, `std::pair`, etc.
-
-### Special Optimization
-
-Define `OPT_OPTION_PTR_OPTIMIZATION` to enable pointer optimization. For pointer types, `option` uses only pointer-sized storage.
 
 ## Method Overview
 
@@ -168,16 +145,17 @@ constexpr auto x = opt::some(2);
 static_assert(x.is_some());
 
 // is_none
-constexpr auto y = opt::none_opt<int>();
+constexpr opt::option<int> y = opt::none;
+// constexpr auto y = opt::none_opt<int>;
 static_assert(y.is_none());
 
 // is_some_and
-constexpr auto x = opt::some(2);
-static_assert(x.is_some_and([](int x) { return x > 1; }));
+constexpr auto z = opt::some(2);
+static_assert(z.is_some_and([](int x) { return x > 1; }));
 
 // is_none_or
-constexpr auto y = opt::none_opt<int>();
-static_assert(y.is_none_or([](int x) { return x == 2; }));
+constexpr auto w = opt::option<int>(opt::none);
+static_assert(w.is_none_or([](int x) { return x == 2; }));
 ```
 
 ### Reference Adapters
@@ -189,14 +167,51 @@ static_assert(y.is_none_or([](int x) { return x == 2; }));
 - `as_deref_mut()`: dereference to `option<U&>`
 
 ```cpp
-int value = 42;
-opt::option<std::unique_ptr<int>> x = opt::some(std::make_unique<int>(value));
-static_assert(std::same_as<decltype(x.as_deref()), opt::option<const int &>>);
-static_assert(std::same_as<decltype(x.as_deref_mut()), opt::option<int &>>);
+// as_ref
+constexpr auto as_ref_test() {
+    auto s = opt::some("abc"s);
 
-opt::option<int *> y = opt::some(&value);
-static_assert(std::same_as<decltype(y.as_deref()), opt::option<const int &>>);
-static_assert(std::same_as<decltype(y.as_deref_mut()), opt::option<int &>>);
+    return s.as_ref().map([](const auto &v) {
+        return v.size();
+    });
+}
+
+static_assert(as_ref_test() == opt::some(3uz));
+
+// as_mut
+constexpr auto as_mut_test() {
+    auto v = opt::some(1);
+
+    *v.as_mut() += 1;
+
+    return v;
+}
+
+static_assert(as_mut_test() == opt::some(2));
+
+// as_deref
+constexpr auto as_deref_test() {
+    auto v = 42;
+
+    auto opt = opt::some(std::addressof(v));
+
+    return opt.as_deref().unwrap();
+}
+
+static_assert(as_deref_test() == opt::some(42));
+
+// as_deref_mut
+constexpr auto as_deref_mut_test() {
+    auto v = 1;
+
+    auto opt = opt::some(std::addressof(v));
+
+    *opt.as_deref_mut() += 1;
+
+    return *opt.unwrap();
+}
+
+static_assert(as_deref_mut_test() == opt::some(2));
 ```
 
 ### Value Extraction
@@ -218,7 +233,7 @@ static_assert(x.unwrap() == "value");
 static_assert(x.expect("should have value") == "value");
 
 // unwrap_or
-constexpr auto y = opt::none_opt<std::string>();
+constexpr opt::option<std::string> y = opt::none;
 constexpr auto default_string = std::string("default");
 static_assert(y.unwrap_or(default_string) == "default");
 
@@ -231,7 +246,7 @@ static_assert(y.unwrap_or_else([] { return std::string("computed"); }) == "compu
 // Note: unwrap_unchecked() is only safe if value is present
 auto z = opt::some(42);
 int v = z.unwrap_unchecked(); // safe
-// auto w = opt::none_opt<int>().unwrap_unchecked(); // undefined behavior
+// auto w = opt::option<int>(opt::none).unwrap_unchecked(); // undefined behavior
 ```
 
 ### Interop with `std::expected`
@@ -243,19 +258,18 @@ int v = z.unwrap_unchecked(); // safe
 
 ```cpp
 // ok_or
-constexpr auto x = opt::some(std::string("foo"));
+constexpr auto x = opt::some("foo"s);
 constexpr auto y = x.ok_or("error"sv);
 static_assert(y.has_value() && y.value() == "foo");
 
-constexpr auto z = opt::none_opt<std::string>();
+constexpr auto z = opt::none_opt<std::string>;
 constexpr auto w = z.ok_or("error info"sv);
 static_assert(!w.has_value() && w.error() == "error info");
 
 // ok_or_else
-constexpr auto err_fn = [] {
+constexpr auto w2 = z.ok_or_else([] {
     return std::string("whatever error");
-};
-constexpr auto w2 = z.ok_or_else(err_fn);
+});
 static_assert(!w2.has_value() && w2.error() == "whatever error");
 
 // transpose
@@ -263,9 +277,9 @@ constexpr auto opt_exp = opt::some(std::expected<int, const char *>{ 42 });
 constexpr auto exp_opt = opt_exp.transpose();
 static_assert(exp_opt.has_value() && exp_opt.value() == opt::some(42));
 
-constexpr auto opt_exp2 = opt::some(std::expected<int, const char *>{ std::unexpected("fail") });
+constexpr auto opt_exp2 = opt::some(std::expected<int, const char *>{ std::unexpected{ "fail" } });
 constexpr auto exp_opt2 = opt_exp2.transpose();
-static_assert(!exp_opt2.has_value() && exp_opt2.error() == std::string_view("fail"));
+static_assert(!exp_opt2.has_value() && exp_opt2.error() == "fail"sv);
 ```
 
 ### Transformation and Mapping
@@ -273,6 +287,7 @@ static_assert(!exp_opt2.has_value() && exp_opt2.error() == std::string_view("fai
 `option` supports various transformation and mapping operations:
 - `map(func)`: apply function if value present
 - `map_or(default, func)`: apply function if present, else return default
+- `map_or_default(func)`: apply function if present, else return default-constructed value of return type of `func`
 - `map_or_else(default_func, func)`: apply function if present, else call default_func
 - `filter(predicate)`: keep value if predicate holds
 - `flatten()`: flatten nested `option<option<T>>`
@@ -284,7 +299,7 @@ constexpr auto x = opt::some(4);
 constexpr auto y = x.map([](int v) { return v * 2; });
 static_assert(y == opt::some(8));
 
-constexpr auto z = opt::none_opt<int>();
+constexpr auto z = opt::option<int>(opt::none);
 constexpr auto w = z.map([](int v) { return v * 2; });
 static_assert(w == opt::none);
 
@@ -292,13 +307,18 @@ static_assert(w == opt::none);
 constexpr auto f = opt::some(10);
 constexpr auto r1 = f.map_or(0, [](int v) { return v + 1; });
 static_assert(r1 == 11);
-constexpr auto r2 = opt::none_opt<int>().map_or(0, [](int v) { return v + 1; });
+constexpr auto r2 = opt::option<int>(opt::none).map_or(0, [](int v) { return v + 1; });
 static_assert(r2 == 0);
+
+// map_or_default
+constexpr opt::option<int> v = opt::none;
+constexpr auto r5 = v.map_or_default([](auto &&v) { return v + 100; });
+static_assert(r5 == 0);
 
 // map_or_else
 constexpr auto r3 = f.map_or_else([] { return 100; }, [](int v) { return v * 3; });
 static_assert(r3 == 30);
-constexpr auto r4 = opt::none_opt<int>().map_or_else([] { return 100; }, [](int v) { return v * 3; });
+constexpr auto r4 = opt::option<int>(opt::none).map_or_else([] { return 100; }, [](int v) { return v * 3; });
 static_assert(r4 == 100);
 
 // filter
@@ -329,9 +349,9 @@ opt::some(123).inspect(log_fn); // prints if value present
 constexpr auto a = opt::some(1);
 constexpr auto b = opt::some(2);
 constexpr auto zipped = a.zip(b);
-static_assert(zipped == opt::some(std::pair(1, 2)));
+static_assert(zipped == opt::some(std::pair{ 1, 2 }));
 
-constexpr auto none_a = opt::none_opt<int>();
+constexpr auto none_a = opt::none_opt<int>;
 constexpr auto zipped2 = none_a.zip(b);
 static_assert(zipped2 == opt::none);
 
@@ -346,7 +366,7 @@ constexpr auto unzipped = pair_opt.unzip();
 static_assert(unzipped.first == opt::some(42));
 static_assert(unzipped.second == opt::some("hi"sv));
 
-constexpr auto none_pair = opt::none_opt<std::pair<int, std::string_view>>();
+constexpr auto none_pair = opt::none_opt<std::pair<int, std::string_view>>;
 constexpr auto unzipped2 = none_pair.unzip();
 static_assert(unzipped2.first == opt::none);
 static_assert(unzipped2.second == opt::none);
@@ -364,7 +384,7 @@ static_assert(unzipped2.second == opt::none);
 ```cpp
 constexpr auto a = opt::some(1);
 constexpr auto b = opt::some(2);
-constexpr auto n = opt::none_opt<int>();
+constexpr auto n = opt::none_opt<int>;
 
 // and_
 static_assert(a.and_(b) == b);
@@ -393,15 +413,27 @@ static_assert(n.or_else(g) == opt::some(99));
 
 ### Comparison and Ordering
 
-If `T` supports comparison, so does `option<T>`. None is always less than Some, and Some is compared by value.
+If `T` supports comparison, `option<T>` also supports all standard comparison operations. The rules are as follows:
+- An empty option (`none`) is always less than an option with a value (`some`).
+- When both are `some`, comparison is done by value.
+- Supports `<`, `<=`, `>`, `>=`, `==`, `!=`, as well as three-way comparison (`<=>`).
+- Supports `lt`, `le`, `gt`, `ge`, `eq`, `ne`, and `cmp`.
 
 ```cpp
 static_assert(opt::none < opt::some(0));
+static_assert(opt::none <= opt::none);
+static_assert(opt::none.le(opt::none));
 static_assert(opt::some(0) < opt::some(1));
+static_assert(opt::some(0) <= opt::some(1));
 static_assert(opt::some(1) > opt::none);
+static_assert(opt::some(1) >= opt::some(0));
+static_assert(opt::some(1).ge(opt::some(0)));
 static_assert(opt::some(1) == opt::some(1));
 static_assert(opt::none == opt::none);
+static_assert(opt::some(1) != opt::some(0));
+static_assert(opt::some(1).ne(opt::some(0)));
 static_assert((opt::some(1) <=> opt::none) == std::strong_ordering::greater);
+static_assert((opt::some(1).cmp(opt::some(1))) == std::strong_ordering::equal);
 ```
 
 ### In-place Modification
@@ -449,10 +481,12 @@ static_assert(with() == std::pair{ opt::some(77), 77 });
 ### Ownership Transfer
 
 `option` supports safe ownership transfer:
-- `take()`: take value and set to none
+- `take()`: take value and set to none, return old value
+- `take_if(pred)`: take value and set to none if pred is satisfied, return old value
 - `replace(value)`: replace with new value, return old value
 
 ```cpp
+// take
 constexpr auto foo() {
     auto x = opt::some(2);
     auto y = x.take();
@@ -460,12 +494,54 @@ constexpr auto foo() {
 }
 static_assert(foo() == std::pair{ opt::none, opt::some(2) });
 
+// take_if
 constexpr auto bar() {
+    auto x = opt::some(3);
+    auto y = x.take_if([](int v) { return v > 5; });
+    return std::pair{ x, y };
+}
+static_assert(bar() == std::pair{ opt::some(3), opt::none });
+
+// replace
+constexpr auto baz() {
     auto s = opt::some("abc"s);
     auto old = s.replace("xyz");
     return std::pair{ s, old };
 }
-static_assert(bar() == std::pair{ opt::some("xyz"s), opt::some("abc"s) });
+static_assert(baz() == std::pair{ opt::some("xyz"s), opt::some("abc"s) });
+```
+
+### Explicit Clone and Copy the Value of Referenced Objects
+
+`option` that stores references supports explicit clone and copy operations on the referenced object, making it convenient to perform deep or shallow copies when needed:
+- `cloned()`：Returns a new object containing a deep copy of the current referenced value. Since it is impossible to determine whether a custom type's copy constructor performs a deep copy, the object needs to have a semantically correct `clone()` member function or be trivially copyable.
+- `copied()`：Returns a new object containing a shallow copy of the current referenced value.
+
+```cpp
+// cloned
+static constexpr auto v_1 = 1;
+constexpr auto ref = opt::some(std::ref(v_1));
+static_assert(ref.cloned() == opt::some(1));
+
+struct x {
+    int v;
+
+    constexpr x clone() const noexcept {
+        return *this;
+    }
+
+    constexpr bool operator==(const x &) const = default;
+};
+
+constexpr auto v_2 = x{ .v = 1 };
+static_assert(opt::some(std::ref(v_2)).cloned() == opt::some(x{ .v = 1 }));
+
+// copied
+struct y {
+    constexpr bool operator==(const y &) const = default;
+};
+constexpr auto v_3 = y{};
+static_assert(opt::some(std::ref(v_3)).copied() == opt::some(y{}));
 ```
 
 ## Examples
@@ -586,9 +662,6 @@ xmake run bench_clang --file=xmake.ci.lua
 ```
 
 To add new benchmarks, refer to `src/bench.cpp` and ensure benchmark is installed.
-
-![CI Benchmarks](./bench-github-ci.png)
-![Native Clang + MSVC STL Benchmark](./bench-github-clang+msvcstl.png)
 
 ## CI (Continuous Integration)
 

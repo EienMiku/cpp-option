@@ -133,6 +133,60 @@ namespace opt {
             }
             return T{};
         }
+
+        constexpr auto eq(const none_t &) const noexcept {
+            return true;
+        }
+
+        template <typename T>
+        constexpr auto eq(const option<T> &other) const noexcept {
+            return *this == other;
+        }
+
+        constexpr auto ne(const none_t &) const noexcept {
+            return false;
+        }
+
+        template <typename T>
+        constexpr auto ne(const option<T> &other) const noexcept {
+            return *this != other;
+        }
+
+        constexpr auto lt(const none_t &) const noexcept {
+            return false;
+        }
+
+        template <typename T>
+        constexpr auto lt(const option<T> &other) const noexcept {
+            return *this < other;
+        }
+
+        constexpr auto le(const none_t &) const noexcept {
+            return true;
+        }
+
+        template <typename T>
+        constexpr auto le(const option<T> &other) const noexcept {
+            return *this <= other;
+        }
+
+        constexpr auto gt(const none_t &) const noexcept {
+            return false;
+        }
+
+        template <typename T>
+        constexpr auto gt(const option<T> &other) const noexcept {
+            return *this > other;
+        }
+
+        constexpr auto ge(const none_t &) const noexcept {
+            return true;
+        }
+
+        template <typename T>
+        constexpr auto ge(const option<T> &other) const noexcept {
+            return *this >= other;
+        }
     };
 
     class option_panic : public std::exception {
@@ -780,10 +834,6 @@ namespace opt {
         
         constexpr void clone_from(const option &source) noexcept {
             storage.has_value_ = source.storage.has_value_;
-        }
-        
-        constexpr auto copy() const noexcept {
-            return *this;
         }
     };
 
@@ -1630,7 +1680,23 @@ namespace opt {
             if (self.is_some()) {
                 return std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(self.unwrap_unchecked()));
             }
-            return static_cast<T>(std::forward<U>(default_value));
+            return std::forward<U>(default_value);
+        }
+
+        // Maps an `option<T>` to a `U` by applying function `f` to the contained value if
+        // the option contains a value, otherwise returns the default constructed value of
+        // the type `U`.
+        template <typename F>
+        constexpr auto map_or_default(this auto &&self, F &&f)
+            requires (std::is_lvalue_reference_v<decltype(self)> ? std::copy_constructible<T>
+                                                                 : std::move_constructible<T>)
+                  && std::invocable<F, decltype(std::forward_like<decltype(self)>(self.unwrap_unchecked()))>
+        {
+            using U = std::invoke_result_t<F, decltype(storage.get())>;
+            if (self.is_some()) {
+                return std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(self.unwrap_unchecked()));
+            }
+            return U{};
         }
 
         // Computes a default function result (if the option is empty), or applies a
@@ -1960,12 +2026,6 @@ namespace opt {
             } else {
                 self.reset();
             }
-        }
-
-        constexpr auto copy(this auto &&self) noexcept(std::is_nothrow_copy_constructible_v<T>)
-            requires std::is_trivially_copyable_v<T>
-        {
-            return option{ self };
         }
 
         static constexpr auto default_() noexcept {
@@ -2594,11 +2654,13 @@ namespace opt {
 
         // Maps an `option<(const) T&>` to an `option<T>` by cloning the contents of the
         // option.
-        constexpr auto cloned(this auto &&self) noexcept(noexcept(self.storage.get().clone()))
-            requires requires { self.storage.get().clone(); } && std::copy_constructible<std::remove_cvref_t<T>>
+        constexpr auto cloned(this auto &&self) noexcept(
+            detail::noexcept_cloneable<std::remove_cvref_t<decltype(self.storage.get())>>)
+            requires detail::cloneable<std::remove_cvref_t<decltype(self.storage.get())>>
         {
             if (self.is_some()) {
-                return option<std::remove_cvref_t<decltype(self.storage.get())>>{ self.storage.get().clone() };
+                return option<std::remove_cvref_t<decltype(self.storage.get())>>{ detail::clone_value(
+                    self.storage.get()) };
             }
             return option<std::remove_cvref_t<decltype(self.storage.get())>>{};
         }
@@ -3114,9 +3176,7 @@ namespace opt {
     }
 
     template <typename T>
-    constexpr auto none_opt() {
-        return option<T>{};
-    }
+    inline constexpr option<T> none_opt{};
 
     template <typename T>
         requires (!detail::specialization_of<std::optional, T>)

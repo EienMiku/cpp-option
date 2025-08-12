@@ -6,14 +6,6 @@
 #include <string>
 #include <vector>
 
-#ifndef BENCHMARK_EX
-    #ifdef BENCHMARK_AGGREGATE
-        #define BENCHMARK_EX(x) BENCHMARK(x)->Repetitions(10)->ReportAggregatesOnly(true)
-    #else
-        #define BENCHMARK_EX(x) BENCHMARK(x)
-    #endif
-#endif
-
 static void BM_opt_option_massive(benchmark::State &state) {
     size_t sum = 0;
     for (auto _ : state) {
@@ -26,7 +18,7 @@ static void BM_opt_option_massive(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_massive);
+BENCHMARK(BM_opt_option_massive);
 
 static void BM_std_optional_massive(benchmark::State &state) {
     size_t sum = 0;
@@ -40,7 +32,7 @@ static void BM_std_optional_massive(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_massive);
+BENCHMARK(BM_std_optional_massive);
 
 static void BM_opt_option_string(benchmark::State &state) {
     size_t sum = 0;
@@ -56,7 +48,7 @@ static void BM_opt_option_string(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_string);
+BENCHMARK(BM_opt_option_string);
 
 static void BM_std_optional_string(benchmark::State &state) {
     size_t sum = 0;
@@ -72,7 +64,7 @@ static void BM_std_optional_string(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_string);
+BENCHMARK(BM_std_optional_string);
 
 static void BM_opt_option_chain(benchmark::State &state) {
     size_t sum = 0;
@@ -90,7 +82,7 @@ static void BM_opt_option_chain(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_chain);
+BENCHMARK(BM_opt_option_chain);
 
 static void BM_std_optional_chain(benchmark::State &state) {
     size_t sum = 0;
@@ -108,7 +100,7 @@ static void BM_std_optional_chain(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_chain);
+BENCHMARK(BM_std_optional_chain);
 
 static void BM_opt_option_memory(benchmark::State &state) {
     size_t sum = 0;
@@ -130,7 +122,7 @@ static void BM_opt_option_memory(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_memory);
+BENCHMARK(BM_opt_option_memory);
 
 static void BM_std_optional_memory(benchmark::State &state) {
     size_t sum = 0;
@@ -152,7 +144,7 @@ static void BM_std_optional_memory(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_memory);
+BENCHMARK(BM_std_optional_memory);
 
 static void BM_opt_option_unwrap_none(benchmark::State &state) {
     opt::option<int> none = opt::none;
@@ -168,7 +160,7 @@ static void BM_opt_option_unwrap_none(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(cnt);
 }
-BENCHMARK_EX(BM_opt_option_unwrap_none);
+BENCHMARK(BM_opt_option_unwrap_none);
 
 static void BM_std_optional_value_nullopt(benchmark::State &state) {
     std::optional<int> none = std::nullopt;
@@ -184,7 +176,7 @@ static void BM_std_optional_value_nullopt(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(cnt);
 }
-BENCHMARK_EX(BM_std_optional_value_nullopt);
+BENCHMARK(BM_std_optional_value_nullopt);
 
 static void BM_opt_option_flatten(benchmark::State &state) {
     size_t sum = 0;
@@ -196,7 +188,7 @@ static void BM_opt_option_flatten(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_flatten);
+BENCHMARK(BM_opt_option_flatten);
 
 static void BM_std_optional_flatten(benchmark::State &state) {
     size_t sum = 0;
@@ -209,7 +201,7 @@ static void BM_std_optional_flatten(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_flatten);
+BENCHMARK(BM_std_optional_flatten);
 
 static void BM_opt_option_ptr(benchmark::State &state) {
     int v      = 42;
@@ -222,7 +214,7 @@ static void BM_opt_option_ptr(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_ptr);
+BENCHMARK(BM_opt_option_ptr);
 
 static void BM_std_optional_ptr(benchmark::State &state) {
     int v    = 42;
@@ -235,7 +227,7 @@ static void BM_std_optional_ptr(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_ptr);
+BENCHMARK(BM_std_optional_ptr);
 
 static void BM_opt_option_vector_move(benchmark::State &state) {
     for (auto _ : state) {
@@ -244,7 +236,7 @@ static void BM_opt_option_vector_move(benchmark::State &state) {
         benchmark::DoNotOptimize(o);
     }
 }
-BENCHMARK_EX(BM_opt_option_vector_move);
+BENCHMARK(BM_opt_option_vector_move);
 
 static void BM_std_optional_vector_move(benchmark::State &state) {
     for (auto _ : state) {
@@ -253,7 +245,7 @@ static void BM_std_optional_vector_move(benchmark::State &state) {
         benchmark::DoNotOptimize(o);
     }
 }
-BENCHMARK_EX(BM_std_optional_vector_move);
+BENCHMARK(BM_std_optional_vector_move);
 
 static void BM_opt_option_and(benchmark::State &state) {
     size_t sum = 0;
@@ -266,7 +258,7 @@ static void BM_opt_option_and(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_and);
+BENCHMARK(BM_opt_option_and);
 
 static void BM_std_optional_and(benchmark::State &state) {
     size_t sum = 0;
@@ -280,7 +272,7 @@ static void BM_std_optional_and(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_and);
+BENCHMARK(BM_std_optional_and);
 
 static void BM_opt_option_or(benchmark::State &state) {
     size_t sum = 0;
@@ -293,7 +285,7 @@ static void BM_opt_option_or(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_or);
+BENCHMARK(BM_opt_option_or);
 
 static void BM_std_optional_or(benchmark::State &state) {
     size_t sum = 0;
@@ -307,7 +299,7 @@ static void BM_std_optional_or(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_or);
+BENCHMARK(BM_std_optional_or);
 
 static void BM_opt_option_xor(benchmark::State &state) {
     size_t sum = 0;
@@ -320,7 +312,7 @@ static void BM_opt_option_xor(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_opt_option_xor);
+BENCHMARK(BM_opt_option_xor);
 
 static void BM_std_optional_xor(benchmark::State &state) {
     size_t sum = 0;
@@ -334,7 +326,7 @@ static void BM_std_optional_xor(benchmark::State &state) {
     }
     benchmark::DoNotOptimize(sum);
 }
-BENCHMARK_EX(BM_std_optional_xor);
+BENCHMARK(BM_std_optional_xor);
 
 BENCHMARK_MAIN();
 // NOLINTEND
