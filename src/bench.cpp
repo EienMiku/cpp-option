@@ -64,8 +64,8 @@ static void BM_std_optional_string(benchmark::State &state) {
         for (size_t i = 0; i < 500000; ++i) {
             auto opt1    = std::make_optional(std::string("test_") + std::to_string(i % 100));
             auto opt2    = (i % 3 == 0) ? std::make_optional(std::string("value")) : std::nullopt;
-            auto result1 = opt1.has_value() ? std::make_optional(opt1->length()) : std::nullopt;
-            auto result2 = opt2.has_value() ? std::make_optional(opt2->length()) : std::nullopt;
+            auto result1 = opt1.transform([](const auto &s) { return s.length(); });
+            auto result2 = opt2.transform([](const auto &s) { return s.length(); });
             sum += result1.value_or(0L);
             sum += result2.value_or(0L);
         }
@@ -97,7 +97,7 @@ static void BM_std_optional_chain(benchmark::State &state) {
     for (auto _ : state) {
         for (size_t i = 0; i < 1000000; ++i) {
             auto opt    = std::make_optional(i % 100);
-            auto result = opt.has_value() ? std::make_optional(*opt * 2) : std::nullopt;
+            auto result = opt.transform([](auto x) { return x * 2; });
             if (result.has_value() && *result > 50) {
                 result = std::make_optional(*result + 10);
             } else {
