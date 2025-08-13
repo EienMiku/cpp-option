@@ -249,7 +249,7 @@ namespace opt {
                 if (this != &other) {
                     if constexpr (!std::is_trivially_destructible_v<T>) {
                         if (has_value_) {
-                            value.T::~T();
+                            std::destroy_at(&value);
                         }
                     }
                     has_value_ = other.has_value_;
@@ -265,13 +265,13 @@ namespace opt {
             = default;
 
             constexpr option_storage &operator=(option_storage &&other) noexcept(std::is_nothrow_move_constructible_v<T>
-                                                                                 && std::is_nothrow_destructible_v<T>)
+                                                                                    && std::is_nothrow_destructible_v<T>)
                 requires std::move_constructible<T> && (!std::is_trivially_move_constructible_v<T>)
             {
                 if (this != &other) {
                     if constexpr (!std::is_trivially_destructible_v<T>) {
                         if (has_value_) {
-                            value.T::~T();
+                            std::destroy_at(&value);
                         }
                     }
                     has_value_ = other.has_value_;
@@ -291,7 +291,7 @@ namespace opt {
                 requires (!std::is_trivially_destructible_v<T>)
             {
                 if (has_value_) {
-                    value.T::~T();
+                    std::destroy_at(&value);
                 }
             }
 
@@ -304,7 +304,7 @@ namespace opt {
                     has_value_ = false;
                 } else {
                     if (has_value_) {
-                        value.T::~T();
+                        std::destroy_at(&value);
                         has_value_ = false;
                     }
                 }
@@ -322,7 +322,7 @@ namespace opt {
             constexpr void emplace(Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts...>) {
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     if (has_value_) {
-                        value.T::~T();
+                        std::destroy_at(&value);
                     }
                 }
                 std::construct_at(&value, std::forward<Ts>(args)...);
@@ -334,7 +334,7 @@ namespace opt {
                 std::is_nothrow_constructible_v<T, std::initializer_list<U>, Ts...>) {
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     if (has_value_) {
-                        value.T::~T();
+                        std::destroy_at(&value);
                     }
                 }
                 std::construct_at(&value, il, std::forward<Ts>(args)...);
