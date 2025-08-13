@@ -42,8 +42,8 @@ static void BM_opt_option_string(benchmark::State &state) {
             auto opt2    = (i % 3 == 0) ? opt::some(std::string("value")) : opt::none;
             auto result1 = opt1.map([](const auto &s) { return s.length(); });
             auto result2 = opt2.map([](const auto &s) { return s.length(); });
-            sum += result1.unwrap_or(0L);
-            sum += result2.unwrap_or(0L);
+            sum += result1.unwrap_or(0);
+            sum += result2.unwrap_or(0);
         }
     }
     benchmark::DoNotOptimize(sum);
@@ -58,8 +58,8 @@ static void BM_std_optional_string(benchmark::State &state) {
             auto opt2    = (i % 3 == 0) ? std::make_optional(std::string("value")) : std::nullopt;
             auto result1 = opt1.transform([](const auto &s) { return s.length(); });
             auto result2 = opt2.transform([](const auto &s) { return s.length(); });
-            sum += result1.value_or(0L);
-            sum += result2.value_or(0L);
+            sum += result1.value_or(0);
+            sum += result2.value_or(0);
         }
     }
     benchmark::DoNotOptimize(sum);
