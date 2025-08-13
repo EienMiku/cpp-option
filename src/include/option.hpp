@@ -250,11 +250,12 @@ namespace opt {
                     if constexpr (!std::is_trivially_destructible_v<T>) {
                         if (has_value_) {
                             std::destroy_at(&value);
+                            has_value_ = false;
                         }
                     }
-                    has_value_ = other.has_value_;
-                    if (has_value_) {
+                    if (other.has_value_) {
                         std::construct_at(&value, other.value);
+                        has_value_ = true;
                     }
                 }
                 return *this;
@@ -272,11 +273,12 @@ namespace opt {
                     if constexpr (!std::is_trivially_destructible_v<T>) {
                         if (has_value_) {
                             std::destroy_at(&value);
+                            has_value_ = false;
                         }
                     }
-                    has_value_ = other.has_value_;
-                    if (has_value_) {
+                    if (other.has_value_) {
                         std::construct_at(&value, std::move(other.value));
+                        has_value_ = true;
                         other.has_value_ = false;
                     }
                 }
@@ -323,6 +325,7 @@ namespace opt {
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     if (has_value_) {
                         std::destroy_at(&value);
+                        has_value_ = false;
                     }
                 }
                 std::construct_at(&value, std::forward<Ts>(args)...);
@@ -335,6 +338,7 @@ namespace opt {
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     if (has_value_) {
                         std::destroy_at(&value);
+                        has_value_ = false;
                     }
                 }
                 std::construct_at(&value, il, std::forward<Ts>(args)...);
@@ -1263,7 +1267,7 @@ namespace opt {
         constexpr auto &emplace(Args &&...args) noexcept(std::is_nothrow_constructible_v<T, Args...>) {
             static_assert(std::is_constructible_v<T, Args...>);
             reset();
-            storage.emplace(T{ std::forward<Args>(args)... });
+            storage.emplace(std::forward<Args>(args)...);
             return storage.get();
         }
 
@@ -1276,7 +1280,7 @@ namespace opt {
             requires std::is_constructible_v<T, std::initializer_list<U> &, Args...>
         {
             reset();
-            storage.emplace(T{ il, std::forward<Args>(args)... });
+            storage.emplace(il, std::forward<Args>(args)...);
             return storage.get();
         }
 
