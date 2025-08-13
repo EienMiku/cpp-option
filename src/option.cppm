@@ -97,6 +97,12 @@ export namespace opt {
 #else
         #define force_inline [[msvc::forceinline]]
 #endif
+
+#if defined(_MSC_VER)
+        #define cpp20_no_unique_address [[msvc::no_unique_address]]
+#else
+        #define cpp20_no_unique_address [[no_unique_address]]
+#endif
     } // namespace detail
 
     struct none_t {
@@ -189,7 +195,7 @@ export namespace opt {
     };
 
     namespace detail {
-        struct empty_byte { };
+        struct empty_byte {};
         
         template <typename T>
         struct option_storage {
@@ -411,7 +417,7 @@ export namespace opt {
         struct option_storage<void> {
             bool has_value_ = false;
 
-            constexpr option_storage() noexcept = default;
+            constexpr option_storage() = default;
             constexpr option_storage(bool has_val) noexcept : has_value_{ has_val } {}
 
             constexpr void get() const noexcept {}
@@ -440,6 +446,46 @@ export namespace opt {
         template <>
         struct option_storage<const volatile void> : option_storage<void> {
             using option_storage<void>::option_storage;
+        };
+
+        template <typename T>
+            requires std::is_empty_v<T>
+        struct option_storage<T> {
+            cpp20_no_unique_address T value;
+            bool has_value_ = false;
+
+            constexpr option_storage() noexcept = default;
+
+            constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<T>) :
+                value{ val }, has_value_{ true } {}
+
+            constexpr option_storage(T &&val) noexcept(std::is_nothrow_move_constructible_v<T>) :
+                value{ std::move(val) }, has_value_{ true } {}
+
+            constexpr auto &&get(this auto &&self) noexcept {
+                return self.value;
+            }
+
+            constexpr bool has_value() const noexcept {
+                return has_value_;
+            }
+
+            constexpr void reset() noexcept {
+                has_value_ = false;
+            }
+
+            template <typename... Ts>
+            constexpr void emplace(Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts...>) {
+                value      = T{ std::forward<Ts>(args)... };
+                has_value_ = true;
+            }
+
+            template <typename U, typename... Ts>
+            constexpr void emplace(std::initializer_list<U> il, Ts &&...args) noexcept(
+                std::is_nothrow_constructible_v<T, std::initializer_list<U>, Ts...>) {
+                value      = T{ il, std::forward<Ts>(args)... };
+                has_value_ = true;
+            }
         };
     } // namespace detail
 
