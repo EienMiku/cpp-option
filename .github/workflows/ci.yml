@@ -38,6 +38,7 @@ jobs:
           xmake --yes --file=xmake.ci.gcc.lua
           xmake run test_unit_gcc
           xmake run bench_gcc
+          xmake run bench_debug_opt_gcc
 
       - name: List build outputs
         run: |
@@ -49,6 +50,8 @@ jobs:
         with:
           name: gcc-binaries
           path: |
+            build/linux/*/release/bench_debug_opt_gcc.sym
+            build/linux/*/release/bench_debug_opt_gcc
             build/linux/*/release/bench_gcc
             build/linux/*/release/test_unit_gcc
           if-no-files-found: warn
@@ -75,6 +78,7 @@ jobs:
           xmake --yes --file=xmake.ci.clang.lua
           xmake run test_unit_clang
           xmake run bench_clang
+          xmake run bench_debug_opt_clang
 
       - name: List build outputs
         run: |
@@ -86,6 +90,8 @@ jobs:
         with:
           name: clang-binaries
           path: |
+            build/linux/*/release/bench_debug_opt_clang.sym
+            build/linux/*/release/bench_debug_opt_clang
             build/linux/*/release/bench_clang
             build/linux/*/release/test_unit_clang
           if-no-files-found: warn
