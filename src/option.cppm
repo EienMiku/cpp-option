@@ -112,12 +112,67 @@ export namespace opt {
             }
             return T{};
         }
+
         template <detail::option_type T>
         constexpr auto xor_(T &&optb) const noexcept {
             if (optb.is_some()) {
                 return std::forward<decltype(optb)>(optb);
             }
             return T{};
+        }
+
+        constexpr auto eq(const none_t &) const noexcept {
+            return true;
+        }
+
+        template <typename T>
+        constexpr auto eq(const option<T> &other) const noexcept {
+            return *this == other;
+        }
+
+        constexpr auto ne(const none_t &) const noexcept {
+            return false;
+        }
+
+        template <typename T>
+        constexpr auto ne(const option<T> &other) const noexcept {
+            return *this != other;
+        }
+
+        constexpr auto lt(const none_t &) const noexcept {
+            return false;
+        }
+
+        template <typename T>
+        constexpr auto lt(const option<T> &other) const noexcept {
+            return *this < other;
+        }
+
+        constexpr auto le(const none_t &) const noexcept {
+            return true;
+        }
+
+        template <typename T>
+        constexpr auto le(const option<T> &other) const noexcept {
+            return *this <= other;
+        }
+
+        constexpr auto gt(const none_t &) const noexcept {
+            return false;
+        }
+
+        template <typename T>
+        constexpr auto gt(const option<T> &other) const noexcept {
+            return *this > other;
+        }
+
+        constexpr auto ge(const none_t &) const noexcept {
+            return true;
+        }
+
+        template <typename T>
+        constexpr auto ge(const option<T> &other) const noexcept {
+            return *this >= other;
         }
     };
 
@@ -153,7 +208,7 @@ export namespace opt {
                 requires std::copy_constructible<T> && (!std::is_trivially_copy_constructible_v<T>)
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
-                    new (&value) T(other.value);
+                    std::construct_at(&value, other.value);
                 }
             }
 
@@ -165,7 +220,7 @@ export namespace opt {
                 requires std::move_constructible<T> && (!std::is_trivially_move_constructible_v<T>)
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
-                    new (&value) T(std::move(other.value));
+                    std::construct_at(&value, std::move(other.value));
                     other.has_value_ = false;
                 }
             }
@@ -186,7 +241,7 @@ export namespace opt {
                     }
                     has_value_ = other.has_value_;
                     if (has_value_) {
-                        new (&value) T(other.value);
+                        std::construct_at(&value, other.value);
                     }
                 }
                 return *this;
@@ -208,7 +263,7 @@ export namespace opt {
                     }
                     has_value_ = other.has_value_;
                     if (has_value_) {
-                        new (&value) T(std::move(other.value));
+                        std::construct_at(&value, std::move(other.value));
                         other.has_value_ = false;
                     }
                 }
@@ -257,7 +312,7 @@ export namespace opt {
                         value.T::~T();
                     }
                 }
-                new (&value) T(std::forward<Ts>(args)...);
+                std::construct_at(&value, std::forward<Ts>(args)...);
                 has_value_ = true;
             }
 
@@ -269,7 +324,7 @@ export namespace opt {
                         value.T::~T();
                     }
                 }
-                new (&value) T(il, std::forward<Ts>(args)...);
+                std::construct_at(&value, il, std::forward<Ts>(args)...);
                 has_value_ = true;
             }
         };
@@ -766,10 +821,6 @@ export namespace opt {
         
         constexpr void clone_from(const option &source) noexcept {
             storage.has_value_ = source.storage.has_value_;
-        }
-        
-        constexpr auto copy() const noexcept {
-            return *this;
         }
     };
 
@@ -1616,7 +1667,23 @@ export namespace opt {
             if (self.is_some()) {
                 return std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(self.unwrap_unchecked()));
             }
-            return static_cast<T>(std::forward<U>(default_value));
+            return std::forward<U>(default_value);
+        }
+
+        // Maps an `option<T>` to a `U` by applying function `f` to the contained value if
+        // the option contains a value, otherwise returns the default constructed value of
+        // the type `U`.
+        template <typename F>
+        constexpr auto map_or_default(this auto &&self, F &&f)
+            requires (std::is_lvalue_reference_v<decltype(self)> ? std::copy_constructible<T>
+                                                                 : std::move_constructible<T>)
+                  && std::invocable<F, decltype(std::forward_like<decltype(self)>(self.unwrap_unchecked()))>
+        {
+            using U = std::invoke_result_t<F, decltype(storage.get())>;
+            if (self.is_some()) {
+                return std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(self.unwrap_unchecked()));
+            }
+            return U{};
         }
 
         // Computes a default function result (if the option is empty), or applies a
@@ -1930,42 +1997,24 @@ export namespace opt {
             return option{};
         }
 
-        constexpr void clone_from(this auto &&self, const option<T> &source)
+        constexpr void clone_from(this auto &&self, const option<T> &source) noexcept(detail::noexcept_cloneable<T>)
             requires detail::cloneable<T> && std::is_copy_assignable_v<T>
         {
             if (source.is_some()) {
                 if (self.is_some()) {
-                    // Reuse existing storage - use clone_value for proper cloning
                     if constexpr (detail::has_clone<T>) {
-                        // If T has clone method, we need to assign the result
                         self.storage.get() = detail::clone_value(source.unwrap_unchecked());
                     } else {
-                        // For other types, direct assignment works
                         self.storage.get() = source.unwrap_unchecked();
                     }
                 } else {
-                    // Need to construct new value
                     self.emplace(detail::clone_value(source.unwrap_unchecked()));
                 }
             } else {
-                // Source is empty, make self empty too
                 self.reset();
             }
         }
-        
-        // Copy trait - indicates that a type implements bitwise copy semantics
-        // In Rust, Copy types are implicitly cloned and don't have destructors that do work
-        // In C++, this roughly corresponds to trivially copyable types
-        constexpr auto copy(this auto &&self) noexcept
-            requires std::is_trivially_copyable_v<T>
-        {
-            // For trivially copyable types, we can just use the copy constructor
-            // These types typically represent "plain old data" or simple value types
-            return option{ self };
-        }
 
-        // Returns an empty option.
-        // Not recommended, use `{}`, `none`, or `none_opt` instead.
         static constexpr auto default_() noexcept {
             return option{};
         }
@@ -2592,11 +2641,13 @@ export namespace opt {
 
         // Maps an `option<(const) T&>` to an `option<T>` by cloning the contents of the
         // option.
-        constexpr auto cloned(this auto &&self) noexcept(noexcept(self.storage.get().clone()))
-            requires requires { self.storage.get().clone(); } && std::copy_constructible<std::remove_cvref_t<T>>
+        constexpr auto cloned(this auto &&self) noexcept(
+            detail::noexcept_cloneable<std::remove_cvref_t<decltype(self.storage.get())>>)
+            requires detail::cloneable<std::remove_cvref_t<decltype(self.storage.get())>>
         {
             if (self.is_some()) {
-                return option<std::remove_cvref_t<decltype(self.storage.get())>>{ self.storage.get().clone() };
+                return option<std::remove_cvref_t<decltype(self.storage.get())>>{ detail::clone_value(
+                    self.storage.get()) };
             }
             return option<std::remove_cvref_t<decltype(self.storage.get())>>{};
         }
@@ -3112,7 +3163,7 @@ export namespace opt {
     }
 
     template <typename T>
-    constexpr auto none_opt() {
+    constexpr option<T> none_opt() noexcept {
         return option<T>{};
     }
 

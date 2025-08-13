@@ -1,3 +1,5 @@
+// NOLINTBEGIN
+
 #include "include/option.hpp"
 #include <format>
 #include <gtest/gtest.h>
@@ -369,8 +371,8 @@ TEST(OptionEdge, HashAndFormat) {
     EXPECT_EQ(s.count(a), 1u);
     EXPECT_EQ(s.count(b), 1u);
     auto str = std::format("{} {}", a, b);
-    EXPECT_TRUE(str.find("some(42)") != std::string::npos);
-    EXPECT_TRUE(str.find("none") != std::string::npos);
+    EXPECT_TRUE(str.contains("some(42)"));
+    EXPECT_TRUE(str.contains("none"));
 }
 
 // =============================
@@ -476,7 +478,7 @@ TEST(OptionAPI, StdOptionalCompat) {
     opt::option<int> o1    = so1;
     EXPECT_TRUE(o1.is_some());
     EXPECT_EQ(o1.unwrap(), 123);
-    std::optional<int> so1b = static_cast<std::optional<int>>(o1);
+    auto so1b = static_cast<std::optional<int>>(o1);
     ASSERT_TRUE(so1b.has_value());
     EXPECT_EQ(*so1b, 123);
 
@@ -484,18 +486,18 @@ TEST(OptionAPI, StdOptionalCompat) {
     std::optional<int> so2 = std::nullopt;
     opt::option<int> o2    = so2;
     EXPECT_TRUE(o2.is_none());
-    std::optional<int> so2b = static_cast<std::optional<int>>(o2);
+    auto so2b = static_cast<std::optional<int>>(o2);
     EXPECT_FALSE(so2b.has_value());
 
     // option some -> optional
     opt::option<int> o3    = opt::some(456);
-    std::optional<int> so3 = static_cast<std::optional<int>>(o3);
+    auto so3 = static_cast<std::optional<int>>(o3);
     ASSERT_TRUE(so3.has_value());
     EXPECT_EQ(*so3, 456);
 
     // option none -> optional
     opt::option<int> o4    = opt::none;
-    std::optional<int> so4 = static_cast<std::optional<int>>(o4);
+    auto so4 = static_cast<std::optional<int>>(o4);
     EXPECT_FALSE(so4.has_value());
 
     // move assign
@@ -678,7 +680,7 @@ TEST(OptionAPI, ExpectMessage) {
         n.expect("custom msg");
         FAIL();
     } catch (const opt::option_panic &e) {
-        EXPECT_TRUE(std::string(e.what()).find("custom msg") != std::string::npos);
+        EXPECT_TRUE(std::string(e.what()).contains("custom msg"));
     }
 }
 
@@ -694,8 +696,8 @@ TEST(OptionAPI, HashFormat) {
     EXPECT_EQ(s.count(a), 1u);
     EXPECT_EQ(s.count(b), 1u);
     auto str = std::format("{} {}", a, b);
-    EXPECT_TRUE(str.find("some(42)") != std::string::npos);
-    EXPECT_TRUE(str.find("none") != std::string::npos);
+    EXPECT_TRUE(str.contains("some(42)"));
+    EXPECT_TRUE(str.contains("none"));
 }
 
 // =============================
@@ -767,3 +769,5 @@ int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+
+// NOLINTEND

@@ -3177,7 +3177,7 @@ namespace opt {
 
     template <typename T>
     constexpr option<T> none_opt() noexcept {
-        return option<T>{ none };
+        return option<T>{};
     }
 
     template <typename T>
