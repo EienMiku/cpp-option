@@ -202,14 +202,17 @@ namespace opt {
     };
 
     namespace detail {
+        struct empty_byte { };
+        
         template <typename T>
         struct option_storage {
             union {
+                empty_byte empty;
                 T value;
             };
             bool has_value_ = false;
 
-            constexpr option_storage() noexcept {}
+            constexpr option_storage() noexcept : empty{} {}
 
             constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<T>) :
                 value{ val }, has_value_{ true } {}
