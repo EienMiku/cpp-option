@@ -1,6 +1,5 @@
+#ifndef OPT_OPTION_HPP
 #define OPT_OPTION_HPP
-
-#pragma once
 
 #include <cassert>
 #include <compare>
@@ -3291,4 +3290,4 @@ struct std::formatter<opt::option<T>> {
     }
 };
 
-#undef OPT_OPTION_HPP
+#endif
