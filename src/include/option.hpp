@@ -462,7 +462,7 @@ namespace opt {
         };
 
         template <typename T>
-            requires std::is_empty_v<T> && std::is_trivially_constructible_v<T>
+            requires std::is_empty_v<T> && std::is_trivial_v<T>
         struct option_storage<T> {
             cpp20_no_unique_address T value;
             bool has_value_ = false;
