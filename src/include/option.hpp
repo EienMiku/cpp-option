@@ -462,7 +462,7 @@ namespace opt {
         };
 
         template <typename T>
-            requires std::is_empty_v<T>
+            requires std::is_empty_v<T> && std::is_trivially_constructible_v<T>
         struct option_storage<T> {
             cpp20_no_unique_address T value;
             bool has_value_ = false;
@@ -3139,15 +3139,6 @@ namespace opt {
         requires (!detail::is_derived_from_optional<U>) && std::three_way_comparable_with<T, U>
     constexpr std::compare_three_way_result_t<T, U> operator<=>(const option<T> &x, const U &v);
 
-    template <typename T>
-    constexpr option<std::decay_t<T>> some(T &&value) noexcept(
-        std::is_nothrow_constructible_v<option<std::decay_t<T>>, T &&>)
-        requires (!detail::specialization_of<std::reference_wrapper, std::decay_t<T>>)
-              && (!detail::option_prohibited_type<std::decay_t<T>>)
-    {
-        return option<std::decay_t<T>>{ std::forward<T>(value) };
-    }
-
     // https://eel.is/c++draft/optional.specalg#lib:swap,optional
     template <class T>
     constexpr void swap(std::optional<T> &x, option<T> &y) noexcept(noexcept(y.swap(x)))
@@ -3188,6 +3179,15 @@ namespace opt {
     constexpr option<T> make_option(std::initializer_list<U> il, Args &&...args) noexcept(
         std::is_nothrow_constructible_v<T, std::initializer_list<U> &, Args...>) {
         return option<T>(std::in_place, il, std::forward<Args>(args)...);
+    }
+
+    template <typename T>
+    constexpr option<std::decay_t<T>> some(T &&value) noexcept(
+        std::is_nothrow_constructible_v<option<std::decay_t<T>>, T &&>)
+        requires (!detail::specialization_of<std::reference_wrapper, std::decay_t<T>>)
+              && (!detail::option_prohibited_type<std::decay_t<T>>)
+    {
+        return option<std::decay_t<T>>{ std::forward<T>(value) };
     }
 
     // needs to specify `<T&>`
