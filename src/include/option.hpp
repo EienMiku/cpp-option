@@ -1,4 +1,4 @@
-#define OPTION_HPP
+#define OPT_OPTION_HPP
 
 #pragma once
 
@@ -105,16 +105,16 @@ namespace opt {
         inline constexpr bool cpp23_reference_constructs_from_temporary_v = false;
 #endif
 
-#if defined(__clang__) || defined (__GNUC__)
-        #define force_inline [[gnu::always_inline]]
+#if defined(__clang__) || defined(__GNUC__)
+    #define force_inline [[gnu::always_inline]]
 #else
-        #define force_inline [[msvc::forceinline]]
+    #define force_inline [[msvc::forceinline]]
 #endif
 
 #if defined(_MSC_VER)
-        #define cpp20_no_unique_address [[msvc::no_unique_address]]
+    #define cpp20_no_unique_address [[msvc::no_unique_address]]
 #else
-        #define cpp20_no_unique_address [[no_unique_address]]
+    #define cpp20_no_unique_address [[no_unique_address]]
 #endif
     } // namespace detail
 
@@ -209,7 +209,7 @@ namespace opt {
 
     namespace detail {
         struct empty_byte {};
-        
+
         template <typename T>
         struct option_storage {
             union {
@@ -275,7 +275,7 @@ namespace opt {
             = default;
 
             constexpr option_storage &operator=(option_storage &&other) noexcept(std::is_nothrow_move_constructible_v<T>
-                                                                                    && std::is_nothrow_destructible_v<T>)
+                                                                                 && std::is_nothrow_destructible_v<T>)
                 requires std::move_constructible<T> && (!std::is_trivially_move_constructible_v<T>)
             {
                 if (this != &other) {
@@ -287,7 +287,7 @@ namespace opt {
                     }
                     if (other.has_value_) {
                         std::construct_at(&value, std::move(other.value));
-                        has_value_ = true;
+                        has_value_       = true;
                         other.has_value_ = false;
                     }
                 }
@@ -884,7 +884,7 @@ namespace opt {
         constexpr auto clone() const noexcept {
             return *this;
         }
-        
+
         constexpr void clone_from(const option &source) noexcept {
             storage.has_value_ = source.storage.has_value_;
         }
@@ -1521,7 +1521,7 @@ namespace opt {
         force_inline constexpr auto and_(this auto &&self, option<T> &&optb) {
             return self.is_some() ? std::move(optb) : option{};
         }
-        
+
         template <detail::option_like U>
             requires (!std::same_as<std::remove_cvref_t<U>, option<T>>)
         force_inline constexpr auto and_(this auto &&self, U &&optb) {
@@ -1974,36 +1974,36 @@ namespace opt {
         {
             const bool self_some = self.is_some();
             const bool optb_some = optb.is_some();
-            
+
             if (self_some != optb_some) {
                 return self_some ? self : optb;
             }
             return option{};
         }
-        
+
         force_inline constexpr auto xor_(this auto &&self, option<T> &&optb)
             requires (std::is_lvalue_reference_v<decltype(self)> ? std::copy_constructible<T>
                                                                  : std::move_constructible<T>)
         {
             const bool self_some = self.is_some();
             const bool optb_some = optb.is_some();
-            
+
             if (self_some != optb_some) {
                 return self_some ? self : std::move(optb);
             }
             return option{};
         }
-        
+
         template <detail::option_like U>
-            requires (!std::same_as<std::remove_cvref_t<U>, option<T>>) 
+            requires (!std::same_as<std::remove_cvref_t<U>, option<T>>)
         force_inline constexpr auto xor_(this auto &&self, U &&optb)
             requires (std::is_lvalue_reference_v<decltype(self)> ? std::copy_constructible<T>
                                                                  : std::move_constructible<T>)
         {
-            auto optb_option = option(std::forward<U>(optb));
+            auto optb_option     = option(std::forward<U>(optb));
             const bool self_some = self.is_some();
             const bool optb_some = optb_option.is_some();
-            
+
             if (self_some != optb_some) {
                 return self_some ? self : optb_option;
             }
@@ -3291,4 +3291,4 @@ struct std::formatter<opt::option<T>> {
     }
 };
 
-#undef OPTION_HPP
+#undef OPT_OPTION_HPP
