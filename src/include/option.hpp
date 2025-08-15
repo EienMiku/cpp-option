@@ -2606,7 +2606,7 @@ namespace opt {
         constexpr auto and_then(F &&f) const {
             using U = std::invoke_result_t<F, T &>;
             static_assert(detail::specialization_of<std::optional, std::remove_cvref_t<U>>
-                          || detail::specialization_of<option, std::remove_cvref_t<U>>);
+                          || detail::specialization_of<::opt::option, std::remove_cvref_t<U>>);
 
             if (is_some()) {
                 auto result = std::invoke(std::forward<F>(f), storage.get());
@@ -3118,7 +3118,7 @@ namespace opt {
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator!=,optional_
     template <class T, class U>
     constexpr bool operator==(const option<T> &x, const U &v)
-        requires (!detail::specialization_of<std::optional, U>) && (!detail::specialization_of<option, U>) && requires {
+        requires (!detail::specialization_of<std::optional, U>) && (!detail::specialization_of<::opt::option, U>) && requires {
             { *x == v } -> std::convertible_to<bool>;
         }
     {
