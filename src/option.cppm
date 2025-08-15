@@ -3236,14 +3236,14 @@ export namespace opt::detail {
     template <typename T>
     concept hash_enabled = requires { std::hash<T>{}(std::declval<T>()); };
 
-    constexpr size_t unspecified_hash_value = 0;
+    constexpr std::size_t unspecified_hash_value = 0;
 } // namespace opt::detail
 
 // https://eel.is/c++draft/optional.hash#lib:hash,optional
 export template <typename T>
     requires opt::detail::hash_enabled<std::remove_const_t<T>> || std::same_as<std::remove_cv_t<T>, void>
 struct std::hash<opt::option<T>> {
-    size_t operator()(const opt::option<T> &o) const
+    std::size_t operator()(const opt::option<T> &o) const
         noexcept(noexcept(std::hash<std::remove_const_t<T>>()(o.unwrap_unchecked()))
                  || std::same_as<std::remove_cv_t<T>, void>) {
         if (o.is_some()) {
