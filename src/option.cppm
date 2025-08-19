@@ -19,23 +19,23 @@ export namespace opt {
     class option;
 
     namespace detail {
-        template <template <typename...> typename Template, typename T>
+        template <typename T, template <typename...> typename Template>
         inline constexpr bool is_specialization_of_v = false;
 
         template <template <typename...> class Template, typename... Ts>
-        inline constexpr bool is_specialization_of_v<Template, Template<Ts...>> = true;
+        inline constexpr bool is_specialization_of_v<Template<Ts...>, Template> = true;
 
-        template <template <typename...> class Template, typename T>
-        concept specialization_of = is_specialization_of_v<Template, T>;
-
-        template <typename T>
-        concept expected_type = specialization_of<std::expected, std::remove_cv_t<T>>;
+        template <typename T, template <typename...> class Template>
+        concept specialization_of = is_specialization_of_v<T, Template>;
 
         template <typename T>
-        concept pair_type = specialization_of<std::pair, std::remove_cvref_t<T>>;
+        concept expected_type = specialization_of<std::remove_cv_t<T>, std::expected>;
 
         template <typename T>
-        concept option_type = specialization_of<option, std::remove_cvref_t<T>>;
+        concept pair_type = specialization_of<std::remove_cvref_t<T>, std::pair>;
+
+        template <typename T>
+        concept option_type = specialization_of<std::remove_cvref_t<T>, option>;
 
         template <typename T>
         concept option_like = option_type<T>
@@ -549,11 +549,11 @@ export namespace opt {
         constexpr auto and_then(F &&f) const {
             using U = std::invoke_result_t<F>;
 
-            static_assert(detail::option_type<U> || detail::specialization_of<std::optional, std::remove_cvref_t<U>>);
+            static_assert(detail::option_type<U> || detail::specialization_of<std::remove_cvref_t<U>, std::optional>);
 
             if (is_some()) {
                 auto result = std::invoke(std::forward<F>(f));
-                if constexpr (detail::specialization_of<std::optional, std::remove_cvref_t<U>>) {
+                if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                     // Convert std::optional to option for consistency
                     using value_type = typename std::remove_cvref_t<U>::value_type;
                     return option<value_type>{ std::move(result) };
@@ -562,7 +562,7 @@ export namespace opt {
                 }
             }
 
-            if constexpr (detail::specialization_of<std::optional, std::remove_cvref_t<U>>) {
+            if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                 // Convert std::optional to option for consistency
                 using value_type = typename std::remove_cvref_t<U>::value_type;
                 return option<value_type>{};
@@ -579,7 +579,7 @@ export namespace opt {
         template <std::invocable F>
         constexpr auto or_else(F &&f) const
             requires (detail::option_type<std::invoke_result_t<F>>
-                      || detail::specialization_of<std::optional, std::remove_cvref_t<std::invoke_result_t<F>>>)
+                      || detail::specialization_of<std::remove_cvref_t<std::invoke_result_t<F>>, std::optional>)
         {
             using U = std::invoke_result_t<F>;
 
@@ -588,7 +588,7 @@ export namespace opt {
             }
 
             auto result = std::invoke(std::forward<F>(f));
-            if constexpr (detail::specialization_of<std::optional, std::remove_cvref_t<U>>) {
+            if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                 // Convert std::optional to option for consistency
                 using value_type = typename std::remove_cvref_t<U>::value_type;
                 return option<value_type>{ std::move(result) };
@@ -1007,7 +1007,7 @@ export namespace opt {
                   && (!std::is_same_v<std::remove_cvref_t<U>, std::optional<T>>)
                   && (!std::is_same_v<std::remove_cvref_t<U>, option>)
                   && ((!std::same_as<std::remove_cv_t<T>, bool>)
-                      || !detail::specialization_of<std::optional, std::remove_cvref_t<U>>)
+                      || !detail::specialization_of<std::remove_cvref_t<U>, std::optional>)
         {
             storage.emplace(std::forward<U>(v));
         }
@@ -1017,7 +1017,7 @@ export namespace opt {
         constexpr explicit(!std::is_convertible_v<const U &, T>)
             option(const std::optional<U> &rhs) noexcept(std::is_nothrow_constructible_v<T, const U &>)
             requires std::is_constructible_v<T, const U &>
-                  && (std::same_as<std::remove_cv_t<T>, bool> || !detail::converts_from_any_cvref<T, std::optional<U>>)
+                  && (std::same_as<std::remove_cv_t<T>, bool> ||  !detail::converts_from_any_cvref<T, std::optional<U>>)
         {
             if (rhs.has_value()) {
                 storage.emplace(*rhs);
@@ -1438,11 +1438,11 @@ export namespace opt {
         constexpr auto and_then(this auto &&self, F &&f) {
             using U = std::invoke_result_t<F, decltype(std::forward_like<decltype(self)>(*self))>;
 
-            static_assert(detail::option_type<U> || detail::specialization_of<std::optional, std::remove_cvref_t<U>>);
+            static_assert(detail::option_type<U> || detail::specialization_of<std::remove_cvref_t<U>, std::optional>);
 
             if (self.is_some()) {
                 auto result = std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(*self));
-                if constexpr (detail::specialization_of<std::optional, std::remove_cvref_t<U>>) {
+                if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                     // Convert std::optional to option for consistency
                     using value_type = typename std::remove_cvref_t<U>::value_type;
                     return option<value_type>{ std::move(result) };
@@ -1451,7 +1451,7 @@ export namespace opt {
                 }
             }
 
-            if constexpr (detail::specialization_of<std::optional, std::remove_cvref_t<U>>) {
+            if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                 // Convert std::optional to option for consistency
                 using value_type = typename std::remove_cvref_t<U>::value_type;
                 return option<value_type>{};
@@ -1473,7 +1473,7 @@ export namespace opt {
         constexpr auto or_else(this auto &&self, F &&f)
             requires std::copy_constructible<T>
                   && (detail::option_type<std::invoke_result_t<F>>
-                      || detail::specialization_of<std::optional, std::remove_cvref_t<std::invoke_result_t<F>>>)
+                      || detail::specialization_of<std::remove_cvref_t<std::invoke_result_t<F>>, std::optional>)
         {
             using U = std::invoke_result_t<F>;
 
@@ -1482,7 +1482,7 @@ export namespace opt {
             }
 
             auto result = std::forward<F>(f)();
-            if constexpr (detail::specialization_of<std::optional, std::remove_cvref_t<U>>) {
+            if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                 // Convert std::optional to option for consistency
                 using value_type = typename std::remove_cvref_t<U>::value_type;
                 return option<value_type>{ std::move(result) };
@@ -2593,12 +2593,12 @@ export namespace opt {
         template <class F>
         constexpr auto and_then(F &&f) const {
             using U = std::invoke_result_t<F, T &>;
-            static_assert(detail::specialization_of<std::optional, std::remove_cvref_t<U>>
-                          || detail::specialization_of<::opt::option, std::remove_cvref_t<U>>);
+            static_assert(detail::specialization_of<std::remove_cvref_t<U>, std::optional>
+                          || detail::specialization_of<std::remove_cvref_t<U>, ::opt::option>);
 
             if (is_some()) {
                 auto result = std::invoke(std::forward<F>(f), storage.get());
-                if constexpr (detail::specialization_of<std::optional, std::remove_cvref_t<U>>) {
+                if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                     // Convert std::optional to option for consistency
                     using value_type = std::remove_cvref_t<U>::value_type;
                     return option<value_type>{ std::move(result) };
@@ -2607,7 +2607,7 @@ export namespace opt {
                 }
             }
 
-            if constexpr (detail::specialization_of<std::optional, std::remove_cvref_t<U>>) {
+            if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                 // Convert std::optional to option for consistency
                 using value_type = std::remove_cvref_t<U>::value_type;
                 return option<value_type>{};
@@ -3106,7 +3106,7 @@ export namespace opt {
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator!=,optional_
     template <class T, class U>
     constexpr bool operator==(const option<T> &x, const U &v)
-        requires (!detail::specialization_of<std::optional, U>) && (!detail::specialization_of<::opt::option, U>) && requires {
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, ::opt::option>) && requires {
             { *x == v } -> std::convertible_to<bool>;
         }
     {
@@ -3171,7 +3171,7 @@ export namespace opt {
     template <typename T>
     constexpr option<std::decay_t<T>> some(T &&value) noexcept(
         std::is_nothrow_constructible_v<option<std::decay_t<T>>, T &&>)
-        requires (!detail::specialization_of<std::reference_wrapper, std::decay_t<T>>)
+        requires (!detail::specialization_of<std::decay_t<T>, std::reference_wrapper>)
               && (!detail::option_prohibited_type<std::decay_t<T>>)
     {
         return option<std::decay_t<T>>{ std::forward<T>(value) };
@@ -3188,7 +3188,7 @@ export namespace opt {
     // std::ref => T&
     template <typename T>
     constexpr option<typename T::type &> some(T value_ref) noexcept
-        requires detail::specialization_of<std::reference_wrapper, T>
+        requires detail::specialization_of<T, std::reference_wrapper>
               && (!detail::option_prohibited_type<typename T::type>)
     {
         return option<typename T::type &>{ value_ref.get() };
@@ -3221,14 +3221,14 @@ export namespace opt {
     }
 
     template <typename T>
-        requires (!detail::specialization_of<std::optional, T>)
+        requires (!detail::specialization_of<T, std::optional>)
     option(T) -> option<T>;
 
     template <typename T>
     option(std::reference_wrapper<T>) -> option<T &>;
 
     template <typename T>
-        requires detail::specialization_of<std::optional, std::remove_cvref_t<T>>
+        requires detail::specialization_of<std::remove_cvref_t<T>, std::optional>
     option(T &&) -> option<typename std::remove_cvref_t<T>::value_type>;
 } // namespace opt
 
