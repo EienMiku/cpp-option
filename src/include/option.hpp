@@ -1029,7 +1029,7 @@ namespace opt {
         constexpr explicit(!std::is_convertible_v<const U &, T>)
             option(const std::optional<U> &rhs) noexcept(std::is_nothrow_constructible_v<T, const U &>)
             requires std::is_constructible_v<T, const U &>
-                  && (std::same_as<T, bool> || !detail::converts_from_any_cvref<T, std::optional<U>>)
+                  && (std::same_as<std::remove_cv_t<T>, bool> ||  !detail::converts_from_any_cvref<T, std::optional<U>>)
         {
             if (rhs.has_value()) {
                 storage.emplace(*rhs);
@@ -1040,7 +1040,7 @@ namespace opt {
         constexpr explicit(!std::convertible_to<const U &, T>)
             option(const option<U> &rhs) noexcept(std::is_nothrow_constructible_v<T, const U &>)
             requires std::is_constructible_v<T, const U &>
-                  && (std::same_as<T, bool> || !detail::converts_from_any_cvref<T, option<U>>)
+                  && (std::same_as<std::remove_cv_t<T>, bool> || !detail::converts_from_any_cvref<T, option<U>>)
         {
             if (rhs.is_some()) {
                 storage.emplace(*rhs);
@@ -1052,7 +1052,7 @@ namespace opt {
         constexpr explicit(!std::is_convertible_v<U, T>)
             option(std::optional<U> &&rhs) noexcept(std::is_nothrow_constructible_v<T, U>)
             requires std::is_constructible_v<T, U>
-                  && (std::same_as<T, bool> || !detail::converts_from_any_cvref<T, std::optional<U>>)
+                  && (std::same_as<std::remove_cv_t<T>, bool> || !detail::converts_from_any_cvref<T, std::optional<U>>)
         {
             if (rhs.has_value()) {
                 storage.emplace(*std::move(rhs));
@@ -1063,7 +1063,7 @@ namespace opt {
         constexpr explicit(!std::convertible_to<U, T>)
             option(option<U> &&rhs) noexcept(std::is_nothrow_constructible_v<T, U>)
             requires std::constructible_from<T, U>
-                  && (std::same_as<T, bool> || !detail::converts_from_any_cvref<T, option<U>>)
+                  && (std::same_as<std::remove_cv_t<T>, bool> || !detail::converts_from_any_cvref<T, option<U>>)
         {
             if (rhs.is_some()) {
                 storage.emplace(std::move(*rhs));
