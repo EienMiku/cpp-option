@@ -2852,7 +2852,6 @@ namespace opt {
             if (is_some()) {
                 return option<T &>{ storage.get() };
             }
-            // 依赖转换运算符
             return option(std::forward<U>(optb));
         }
 
