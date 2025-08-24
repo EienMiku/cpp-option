@@ -2290,7 +2290,7 @@ export namespace opt {
 
         // https://eel.is/c++draft/optional.ref.ctor#itemdecl:1
         template <class Arg>
-        constexpr explicit option(std::in_place_t, Arg &&arg)
+        constexpr explicit option(std::in_place_t, Arg &&arg) noexcept(std::is_nothrow_constructible_v<T &, Arg>)
             requires std::is_constructible_v<T &, Arg>
                   && (!detail::cpp23_reference_constructs_from_temporary_v<T &, Arg>)
         {
