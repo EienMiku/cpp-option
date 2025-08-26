@@ -3122,8 +3122,11 @@ export namespace opt {
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3e=,optional
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3e=,optional_
     template <class T, class U>
+    constexpr std::compare_three_way_result_t<T, U> operator<=>(const option<T> &x, const U &v)
         requires (!detail::is_derived_from_optional<U>) && std::three_way_comparable_with<T, U>
-    constexpr std::compare_three_way_result_t<T, U> operator<=>(const option<T> &x, const U &v);
+    {
+        return x.is_some() ? (*x <=> v) : std::strong_ordering::less;
+    }
 
     // https://eel.is/c++draft/optional.specalg#lib:swap,optional
     template <class T>
