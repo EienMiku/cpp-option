@@ -8,7 +8,6 @@ add_requires("benchmark", {system = false})
 
 -- GCC (libstdc++) test
 
-
 target("test_unit_gcc")
     set_kind("binary")
     add_files("src/test_unit.cpp")
@@ -16,7 +15,14 @@ target("test_unit_gcc")
     add_includedirs("src/include")
     set_toolchains("gcc")
     set_encodings("source:utf-8", "target:utf-8")
-    set_warnings("allextra")
+
+target("test_unit_v2_clang")
+    set_kind("binary")
+    add_files("src/test_unit_v2.cpp")
+    add_includedirs("src/include")
+    add_includedirs("external/llvm-project/libcxx/test/support")
+    set_toolchains("gcc")
+    set_encodings("source:utf-8", "target:utf-8")
 
 target("bench_gcc")
     set_kind("binary")
@@ -26,7 +32,6 @@ target("bench_gcc")
     set_optimize("fastest")
     set_toolchains("gcc")
     set_encodings("source:utf-8", "target:utf-8")
-    set_warnings("allextra")
 
 target("bench_debug_opt_gcc")
     set_kind("binary")
@@ -37,4 +42,3 @@ target("bench_debug_opt_gcc")
     set_symbols("debug")
     set_toolchains("gcc")
     set_encodings("source:utf-8", "target:utf-8")
-    set_warnings("allextra")

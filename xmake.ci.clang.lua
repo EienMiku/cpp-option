@@ -1,7 +1,7 @@
 add_rules("mode.debug", "mode.release")
 add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
 
-set_languages("c++latest")
+set_languages("clatest", "cxxlatest")
 
 add_requires("gtest", {
     configs = {
@@ -31,7 +31,14 @@ target("test_unit_clang")
     set_runtimes("c++_static")
     add_cxxflags("-stdlib=libc++")
     set_encodings("source:utf-8", "target:utf-8")
-    set_warnings("allextra")
+
+target("test_unit_v2_clang")
+    set_kind("binary")
+    add_files("src/test_unit_v2.cpp")
+    add_includedirs("src/include")
+    add_includedirs("external/llvm-project/libcxx/test/support")
+    add_cxxflags("-stdlib=libc++")
+    set_encodings("source:utf-8", "target:utf-8")
 
 target("bench_clang")
     set_kind("binary")
@@ -43,7 +50,6 @@ target("bench_clang")
     set_runtimes("c++_static")
     add_cxxflags("-stdlib=libc++")
     set_encodings("source:utf-8", "target:utf-8")
-    set_warnings("allextra")
 
 target("bench_debug_opt_clang")
     set_kind("binary")
@@ -56,4 +62,3 @@ target("bench_debug_opt_clang")
     set_runtimes("c++_static")
     add_cxxflags("-stdlib=libc++")
     set_encodings("source:utf-8", "target:utf-8")
-    set_warnings("allextra")
