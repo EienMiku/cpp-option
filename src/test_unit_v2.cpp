@@ -8591,15 +8591,14 @@ namespace msvc {
         };
     } // namespace vso458030
 
-    // Passes in GCC
-    // namespace vso508126 {
-    //     // Defend against regression of VSO-508126
-    //     void run_test() {
-    //         struct S {};
-    //         static_assert(!std::is_copy_constructible_v<volatile S>);
-    //         static_assert(!std::is_copy_constructible_v<opt::option<volatile S>>);
-    //     }
-    // } // namespace vso508126
+    namespace vso508126 {
+        // Defend against regression of VSO-508126
+        void run_test() {
+            struct S {};
+            static_assert(!std::is_copy_constructible_v<volatile S>);
+            static_assert(!std::is_copy_constructible_v<opt::option<volatile S>>);
+        }
+    } // namespace vso508126
 
     namespace vso614907 {
         // Defend against regression of VSO-614907
@@ -8853,7 +8852,7 @@ int main() {
     msvc::lwg3886::run_test();
 
     msvc::vso406124::run_test();
-    // msvc::vso508126::run_test();
+    msvc::vso508126::run_test();
     msvc::vso614907::run_test();
 
     msvc::gh2458::run_test();

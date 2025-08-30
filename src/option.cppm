@@ -224,90 +224,90 @@ export namespace opt {
 
             constexpr option_storage() noexcept : empty{} {}
 
-            constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<stored_type>) :
+            constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<T>) :
                 value{ val }, has_value_{ true } {}
 
-            constexpr option_storage(T &&val) noexcept(std::is_nothrow_move_constructible_v<stored_type>) :
+            constexpr option_storage(T &&val) noexcept(std::is_nothrow_move_constructible_v<T>) :
                 value{ std::move(val) }, has_value_{ true } {}
 
             constexpr option_storage(const option_storage &other) noexcept(
-                std::is_nothrow_copy_constructible_v<stored_type>)
-                requires std::is_copy_constructible_v<stored_type> && (!std::is_trivially_copy_constructible_v<stored_type>)
+                std::is_nothrow_copy_constructible_v<T>)
+                requires std::is_copy_constructible_v<T> && (!std::is_trivially_copy_constructible_v<T>)
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
-                    std::construct_at<stored_type>(std::addressof(value), other.value);
+                    std::construct_at(std::addressof(value), other.value);
                 }
             }
 
             constexpr option_storage(const option_storage &other) noexcept
-                requires std::is_trivially_copy_constructible_v<stored_type>
+                requires std::is_trivially_copy_constructible_v<T>
             = default;
 
-            constexpr option_storage(option_storage &&other) noexcept(std::is_nothrow_move_constructible_v<stored_type>)
-                requires std::move_constructible<stored_type> && (!std::is_trivially_move_constructible_v<stored_type>)
+            constexpr option_storage(option_storage &&other) noexcept(std::is_nothrow_move_constructible_v<T>)
+                requires std::move_constructible<T> && (!std::is_trivially_move_constructible_v<T>)
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
-                    std::construct_at<stored_type>(std::addressof(value), std::move(other.value));
+                    std::construct_at(std::addressof(value), std::move(other.value));
                     other.has_value_ = false;
                 }
             }
 
-            constexpr option_storage(option_storage &&other) noexcept(std::is_nothrow_copy_constructible_v<stored_type>)
-                requires (!std::is_move_constructible_v<stored_type>
-                          && std::is_copy_constructible_v<stored_type>
-                          && (!std::is_trivially_copy_constructible_v<stored_type>))
+            constexpr option_storage(option_storage &&other) noexcept(std::is_nothrow_copy_constructible_v<T>)
+                requires (!std::is_move_constructible_v<T>
+                          && std::is_copy_constructible_v<T>
+                          && (!std::is_trivially_copy_constructible_v<T>))
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
-                    std::construct_at<stored_type>(std::addressof(value), other.value);
+                    std::construct_at(std::addressof(value), other.value);
                 }
             }
 
             constexpr option_storage(option_storage &&other) noexcept
-                requires std::is_trivially_move_constructible_v<stored_type>
+                requires std::is_trivially_move_constructible_v<T>
             = default;
 
             template <class... Ts>
             constexpr option_storage(std::in_place_t,
-                                     Ts &&...args) noexcept(std::is_nothrow_constructible_v<stored_type, Ts...>) :
+                                     Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts...>) :
                 value(std::forward<Ts>(args)...), has_value_{ true } {}
 
             template <class F, class... Ts>
             constexpr option_storage(within_invoke_t, F &&f, Ts &&...args) noexcept(
-                std::is_nothrow_constructible_v<stored_type,
+                std::is_nothrow_constructible_v<T,
                                                 decltype(std::invoke(std::forward<F>(f), std::forward<Ts>(args)...))>) :
                 value{ std::invoke(std::forward<F>(f), std::forward<Ts>(args)...) }, has_value_{ true } {}
 
             constexpr option_storage &operator=(const option_storage &other)
-                requires (std::is_trivially_copy_assignable_v<stored_type>
-                          && std::is_trivially_copy_constructible_v<stored_type>)
+                requires (std::is_trivially_copy_assignable_v<T>
+                          && std::is_trivially_copy_constructible_v<T>)
             = default;
 
             constexpr option_storage &operator=(const option_storage &other) noexcept(
-                std::is_nothrow_copy_assignable_v<stored_type>
-                && (std::is_nothrow_copy_constructible_v<stored_type> && std::is_nothrow_destructible_v<stored_type>))
-                requires (!(std::is_trivially_copy_assignable_v<stored_type>
-                            && std::is_trivially_copy_constructible_v<stored_type>)
-                          && (std::is_copy_constructible_v<stored_type> || std::is_copy_assignable_v<stored_type>))
+                std::is_nothrow_copy_assignable_v<T>
+                && (std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_destructible_v<T>))
+                requires (!(std::is_trivially_copy_assignable_v<T>
+                            && std::is_trivially_copy_constructible_v<T>)
+                          && (std::is_copy_constructible_v<T> || std::is_copy_assignable_v<T>))
             {
                 if (this == &other) {
                     return *this;
                 }
 
                 if (has_value_ && other.has_value_) {
-                    if constexpr (std::is_copy_assignable_v<stored_type>) {
+                    if constexpr (std::is_copy_assignable_v<T>) {
                         value = other.value;
                     } else {
                         std::destroy_at(&value);
-                        std::construct_at<stored_type>(std::addressof(value), other.value);
+                        std::construct_at(std::addressof(value), other.value);
                     }
                 } else if (has_value_ && !other.has_value_) {
-                    if constexpr (!std::is_trivially_destructible_v<stored_type>) {
+                    if constexpr (!std::is_trivially_destructible_v<T>) {
                         std::destroy_at(&value);
                     }
                     has_value_ = false;
                 } else if (!has_value_ && other.has_value_) {
-                    static_assert(std::is_copy_constructible_v<stored_type>);
-                    std::construct_at<stored_type>(std::addressof(value), other.value);
+                    static_assert(std::is_copy_constructible_v<T>);
+                    std::construct_at(std::addressof(value), other.value);
                     has_value_ = true;
                 }
 
@@ -315,37 +315,37 @@ export namespace opt {
             }
 
             constexpr option_storage &operator=(option_storage &&other)
-                requires (std::is_trivially_move_assignable_v<stored_type>
-                          && std::is_trivially_move_constructible_v<stored_type>)
+                requires (std::is_trivially_move_assignable_v<T>
+                          && std::is_trivially_move_constructible_v<T>)
             = default;
 
             constexpr option_storage &operator=(option_storage &&other) noexcept(
-                std::is_nothrow_move_assignable_v<stored_type>
-                && (std::is_nothrow_move_constructible_v<stored_type> && std::is_nothrow_destructible_v<stored_type>))
-                requires (!(std::is_trivially_move_assignable_v<stored_type>
-                            && std::is_trivially_move_constructible_v<stored_type>)
-                          && (std::is_move_constructible_v<stored_type> || std::is_move_assignable_v<stored_type>))
+                std::is_nothrow_move_assignable_v<T>
+                && (std::is_nothrow_move_constructible_v<T> && std::is_nothrow_destructible_v<T>))
+                requires (!(std::is_trivially_move_assignable_v<T>
+                            && std::is_trivially_move_constructible_v<T>)
+                          && (std::is_move_constructible_v<T> || std::is_move_assignable_v<T>))
             {
                 if (this == &other) {
                     return *this;
                 }
 
                 if (has_value_ && other.has_value_) {
-                    if constexpr (std::is_move_assignable_v<stored_type>) {
+                    if constexpr (std::is_move_assignable_v<T>) {
                         value = std::move(other.value);
                     } else {
                         std::destroy_at(&value);
-                        std::construct_at<stored_type>(std::addressof(value), std::move(other.value));
+                        std::construct_at(std::addressof(value), std::move(other.value));
                     }
                     other.has_value_ = false;
                 } else if (has_value_ && !other.has_value_) {
-                    if constexpr (!std::is_trivially_destructible_v<stored_type>) {
+                    if constexpr (!std::is_trivially_destructible_v<T>) {
                         std::destroy_at(&value);
                     }
                     has_value_ = false;
                 } else if (!has_value_ && other.has_value_) {
-                    static_assert(std::is_move_constructible_v<stored_type>);
-                    std::construct_at<stored_type>(std::addressof(value), std::move(other.value));
+                    static_assert(std::is_move_constructible_v<T>);
+                    std::construct_at(std::addressof(value), std::move(other.value));
                     has_value_       = true;
                     other.has_value_ = false;
                 }
@@ -354,7 +354,7 @@ export namespace opt {
             }
 
             constexpr ~option_storage() noexcept
-                requires (!std::is_trivially_destructible_v<stored_type>)
+                requires (!std::is_trivially_destructible_v<T>)
             {
                 if (has_value_) {
                     std::destroy_at(&value);
@@ -362,11 +362,11 @@ export namespace opt {
             }
 
             constexpr ~option_storage() noexcept
-                requires std::is_trivially_destructible_v<stored_type>
+                requires std::is_trivially_destructible_v<T>
             = default;
 
             constexpr void reset() noexcept {
-                if constexpr (std::is_trivially_destructible_v<stored_type>) {
+                if constexpr (std::is_trivially_destructible_v<T>) {
                     has_value_ = false;
                 } else {
                     if (has_value_) {
@@ -389,27 +389,27 @@ export namespace opt {
             }
 
             template <typename... Ts>
-            constexpr void emplace(Ts &&...args) noexcept(std::is_nothrow_constructible_v<stored_type, Ts...>) {
+            constexpr void emplace(Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts...>) {
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     if (has_value_) {
                         std::destroy_at(&value);
                         has_value_ = false;
                     }
                 }
-                std::construct_at<stored_type>(std::addressof(value), std::forward<Ts>(args)...);
+                std::construct_at(std::addressof(value), std::forward<Ts>(args)...);
                 has_value_ = true;
             }
 
             template <typename U, typename... Ts>
             constexpr void emplace(std::initializer_list<U> il, Ts &&...args) noexcept(
-                std::is_nothrow_constructible_v<stored_type, std::initializer_list<U>, Ts...>) {
+                std::is_nothrow_constructible_v<T, std::initializer_list<U>, Ts...>) {
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     if (has_value_) {
                         std::destroy_at(&value);
                         has_value_ = false;
                     }
                 }
-                std::construct_at<stored_type>(std::addressof(value), il, std::forward<Ts>(args)...);
+                std::construct_at(std::addressof(value), il, std::forward<Ts>(args)...);
                 has_value_ = true;
             }
         };
@@ -531,6 +531,14 @@ export namespace opt {
 
             constexpr option_storage() noexcept = default;
 
+            constexpr option_storage(const option_storage &)
+                requires std::is_copy_constructible_v<T>
+            = default;
+
+            constexpr option_storage(option_storage &&)
+                requires std::is_move_constructible_v<T>
+            = default;
+
             constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<T>) :
                 value{ val }, has_value_{ true } {}
 
@@ -548,6 +556,14 @@ export namespace opt {
                                                 decltype(std::invoke(std::forward<F>(f), std::forward<Ts>(args)...))>) :
                 value{ std::invoke(std::forward<F>(f), std::forward<Ts>(args)...) }, has_value_{ true } {}
 
+            constexpr option_storage &operator=(const option_storage &)
+                requires std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>
+            = default;
+
+            constexpr option_storage &operator=(option_storage &&)
+                requires std::is_move_constructible_v<T> && std::is_move_assignable_v<T>
+            = default;
+
             constexpr auto &&get(this auto &&self) noexcept {
                 return self.value;
             }
@@ -562,7 +578,7 @@ export namespace opt {
 
             template <typename... Ts>
             constexpr void emplace(Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts...>) {
-                std::construct_at<stored_type>(std::addressof(value), std::forward<Ts>(args)...);
+                std::construct_at(std::addressof(value), std::forward<Ts>(args)...);
                 has_value_ = true;
             }
 
