@@ -297,12 +297,12 @@ export namespace opt {
                     if constexpr (std::is_copy_assignable_v<T>) {
                         value = other.value;
                     } else {
-                        std::destroy_at(&value);
+                        std::destroy_at(std::addressof(value));
                         std::construct_at(std::addressof(value), other.value);
                     }
                 } else if (has_value_ && !other.has_value_) {
                     if constexpr (!std::is_trivially_destructible_v<T>) {
-                        std::destroy_at(&value);
+                        std::destroy_at(std::addressof(value));
                     }
                     has_value_ = false;
                 } else if (!has_value_ && other.has_value_) {
@@ -334,13 +334,13 @@ export namespace opt {
                     if constexpr (std::is_move_assignable_v<T>) {
                         value = std::move(other.value);
                     } else {
-                        std::destroy_at(&value);
+                        std::destroy_at(std::addressof(value));
                         std::construct_at(std::addressof(value), std::move(other.value));
                     }
                     other.has_value_ = false;
                 } else if (has_value_ && !other.has_value_) {
                     if constexpr (!std::is_trivially_destructible_v<T>) {
-                        std::destroy_at(&value);
+                        std::destroy_at(std::addressof(value));
                     }
                     has_value_ = false;
                 } else if (!has_value_ && other.has_value_) {
@@ -357,7 +357,7 @@ export namespace opt {
                 requires (!std::is_trivially_destructible_v<T>)
             {
                 if (has_value_) {
-                    std::destroy_at(&value);
+                    std::destroy_at(std::addressof(value));
                 }
             }
 
@@ -370,7 +370,7 @@ export namespace opt {
                     has_value_ = false;
                 } else {
                     if (has_value_) {
-                        std::destroy_at(&value);
+                        std::destroy_at(std::addressof(value));
                         has_value_ = false;
                     }
                 }
@@ -392,7 +392,7 @@ export namespace opt {
             constexpr void emplace(Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts...>) {
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     if (has_value_) {
-                        std::destroy_at(&value);
+                        std::destroy_at(std::addressof(value));
                         has_value_ = false;
                     }
                 }
@@ -405,7 +405,7 @@ export namespace opt {
                 std::is_nothrow_constructible_v<T, std::initializer_list<U>, Ts...>) {
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     if (has_value_) {
-                        std::destroy_at(&value);
+                        std::destroy_at(std::addressof(value));
                         has_value_ = false;
                     }
                 }
