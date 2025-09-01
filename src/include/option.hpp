@@ -236,15 +236,16 @@ namespace opt {
 
             constexpr option_storage() noexcept : empty{} {}
 
-            constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<T>) :
+            constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<stored_type>) :
                 value{ val }, has_value_{ true } {}
 
-            constexpr option_storage(T &&val) noexcept(std::is_nothrow_move_constructible_v<T>) :
+            constexpr option_storage(T &&val) noexcept(std::is_nothrow_move_constructible_v<stored_type>) :
                 value{ std::move(val) }, has_value_{ true } {}
 
             constexpr option_storage(const option_storage &other) noexcept(
-                std::is_nothrow_copy_constructible_v<T>)
-                requires std::is_copy_constructible_v<T> && (!std::is_trivially_copy_constructible_v<T>)
+                std::is_nothrow_copy_constructible_v<stored_type>)
+                requires std::is_copy_constructible_v<stored_type>
+                      && (!std::is_trivially_copy_constructible_v<stored_type>)
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
                     std::construct_at(std::addressof(value), other.value);
@@ -252,25 +253,18 @@ namespace opt {
             }
 
             constexpr option_storage(const option_storage &other) noexcept
-                requires std::is_trivially_copy_constructible_v<T>
+                requires std::is_trivially_copy_constructible_v<stored_type>
             = default;
 
             constexpr option_storage(option_storage &&other) noexcept(std::is_nothrow_move_constructible_v<T>)
                 requires std::move_constructible<T> && (!std::is_trivially_move_constructible_v<T>)
                 : has_value_{ other.has_value_ } {
                 if (has_value_) {
-                    std::construct_at(std::addressof(value), std::move(other.value));
-                    other.has_value_ = false;
-                }
-            }
-
-            constexpr option_storage(option_storage &&other) noexcept(std::is_nothrow_copy_constructible_v<T>)
-                requires (!std::is_move_constructible_v<T>
-                          && std::is_copy_constructible_v<T>
-                          && (!std::is_trivially_copy_constructible_v<T>))
-                : has_value_{ other.has_value_ } {
-                if (has_value_) {
-                    std::construct_at(std::addressof(value), other.value);
+                    if constexpr (std::is_const_v<T>) {
+                        std::construct_at(std::addressof(value), std::forward<T>(other.value));
+                    } else {
+                        std::construct_at(std::addressof(value), std::move(other.value));
+                    }
                 }
             }
 
@@ -290,15 +284,13 @@ namespace opt {
                 value{ std::invoke(std::forward<F>(f), std::forward<Ts>(args)...) }, has_value_{ true } {}
 
             constexpr option_storage &operator=(const option_storage &other)
-                requires (std::is_trivially_copy_assignable_v<T>
-                          && std::is_trivially_copy_constructible_v<T>)
+                requires (std::is_trivially_copy_assignable_v<T> && std::is_trivially_copy_constructible_v<T>)
             = default;
 
             constexpr option_storage &operator=(const option_storage &other) noexcept(
                 std::is_nothrow_copy_assignable_v<T>
                 && (std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_destructible_v<T>))
-                requires (!(std::is_trivially_copy_assignable_v<T>
-                            && std::is_trivially_copy_constructible_v<T>)
+                requires (!(std::is_trivially_copy_assignable_v<T> && std::is_trivially_copy_constructible_v<T>)
                           && (std::is_copy_constructible_v<T> || std::is_copy_assignable_v<T>))
             {
                 if (this == &other) {
@@ -327,15 +319,13 @@ namespace opt {
             }
 
             constexpr option_storage &operator=(option_storage &&other)
-                requires (std::is_trivially_move_assignable_v<T>
-                          && std::is_trivially_move_constructible_v<T>)
+                requires (std::is_trivially_move_assignable_v<T> && std::is_trivially_move_constructible_v<T>)
             = default;
 
             constexpr option_storage &operator=(option_storage &&other) noexcept(
                 std::is_nothrow_move_assignable_v<T>
                 && (std::is_nothrow_move_constructible_v<T> && std::is_nothrow_destructible_v<T>))
-                requires (!(std::is_trivially_move_assignable_v<T>
-                            && std::is_trivially_move_constructible_v<T>)
+                requires (!(std::is_trivially_move_assignable_v<T> && std::is_trivially_move_constructible_v<T>)
                           && (std::is_move_constructible_v<T> || std::is_move_assignable_v<T>))
             {
                 if (this == &other) {
@@ -349,7 +339,6 @@ namespace opt {
                         std::destroy_at(std::addressof(value));
                         std::construct_at(std::addressof(value), std::move(other.value));
                     }
-                    other.has_value_ = false;
                 } else if (has_value_ && !other.has_value_) {
                     if constexpr (!std::is_trivially_destructible_v<T>) {
                         std::destroy_at(std::addressof(value));
@@ -358,8 +347,7 @@ namespace opt {
                 } else if (!has_value_ && other.has_value_) {
                     static_assert(std::is_move_constructible_v<T>);
                     std::construct_at(std::addressof(value), std::move(other.value));
-                    has_value_       = true;
-                    other.has_value_ = false;
+                    has_value_ = true;
                 }
 
                 return *this;
@@ -559,7 +547,7 @@ namespace opt {
 
             template <class... Ts>
             constexpr option_storage(std::in_place_t,
-                                        Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts...>) :
+                                     Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts...>) :
                 value(std::forward<Ts>(args)...), has_value_{ true } {}
 
             template <class F, class... Ts>
@@ -1120,7 +1108,7 @@ namespace opt {
                   && (std::same_as<std::remove_cv_t<T>, bool> || !detail::converts_from_any_cvref<T, option<U>>)
         {
             if (rhs.is_some()) {
-                storage.emplace(*rhs);
+                storage.emplace(rhs.storage.get());
             }
         }
 
@@ -1143,7 +1131,7 @@ namespace opt {
                   && (std::same_as<std::remove_cv_t<T>, bool> || !detail::converts_from_any_cvref<T, option<U>>)
         {
             if (rhs.is_some()) {
-                storage.emplace(std::move(*rhs));
+                storage.emplace(std::move(rhs.storage.get()));
             }
         }
 
@@ -2623,7 +2611,7 @@ namespace opt {
         constexpr auto and_then(F &&f) const {
             using U = std::invoke_result_t<F, T &>;
             static_assert(detail::specialization_of<std::remove_cvref_t<U>, std::optional>
-                          || detail::specialization_of<std::remove_cvref_t<U>, ::opt::option>);
+                          || detail::specialization_of<std::remove_cvref_t<U>, option>);
 
             if (is_some()) {
                 auto result = std::invoke(std::forward<F>(f), storage.get());
@@ -3197,7 +3185,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator==(const option<T> &x, const U &v) noexcept(noexcept(static_cast<bool>(*x == v)))
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { *x == v } -> std::convertible_to<bool>;
                  }
@@ -3209,7 +3197,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator==(const T &v, const option<U> &x) noexcept(noexcept(static_cast<bool>(v == *x)))
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { v == *x } -> std::convertible_to<bool>;
                  }
@@ -3221,7 +3209,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator!=(const option<T> &x, const U &v) noexcept(noexcept(static_cast<bool>(*x != v)))
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { *x != v } -> std::convertible_to<bool>;
                  }
@@ -3233,7 +3221,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator!=(const T &v, const option<U> &x) noexcept(noexcept(static_cast<bool>(v != *x)))
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { v != *x } -> std::convertible_to<bool>;
                  }
@@ -3245,7 +3233,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator<(const option<T> &x, const U &v)
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { *x < v } -> std::convertible_to<bool>;
                  }
@@ -3257,7 +3245,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator<(const T &v, const option<U> &x)
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { v < *x } -> std::convertible_to<bool>;
                  }
@@ -3269,7 +3257,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator>(const option<T> &x, const U &v)
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { *x > v } -> std::convertible_to<bool>;
                  }
@@ -3281,7 +3269,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator>(const T &v, const option<U> &x)
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { v > *x } -> std::convertible_to<bool>;
                  }
@@ -3293,7 +3281,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator<=(const option<T> &x, const U &v)
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { *x <= v } -> std::convertible_to<bool>;
                  }
@@ -3305,7 +3293,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator<=(const T &v, const option<U> &x)
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { v <= *x } -> std::convertible_to<bool>;
                  }
@@ -3317,7 +3305,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator>=(const option<T> &x, const U &v)
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { *x >= v } -> std::convertible_to<bool>;
                  }
@@ -3329,7 +3317,7 @@ namespace opt {
     template <class T, class U>
     constexpr bool operator>=(const T &v, const option<U> &x)
         requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, ::opt::option>)
+              && (!detail::specialization_of<U, option>)
               && requires {
                      { v >= *x } -> std::convertible_to<bool>;
                  }
@@ -3494,5 +3482,8 @@ struct std::formatter<opt::option<T>> {
         }
     }
 };
+
+#undef cpp20_no_unique_address
+#undef force_inline
 
 #endif

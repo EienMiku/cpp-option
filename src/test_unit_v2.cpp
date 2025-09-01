@@ -423,7 +423,7 @@ constexpr bool operator>(const X& lhs, const X& rhs) { return lhs.i_ > rhs.i_; }
 int run_test() {
   {
     typedef X T;
-    typedef std::optional<T> O;
+    typedef opt::option<T> O;
 
     constexpr T val(2);
     constexpr O o1;      // disengaged
