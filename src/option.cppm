@@ -105,12 +105,16 @@ export namespace opt {
         inline constexpr bool cpp23_reference_constructs_from_temporary_v = false;
 #endif
 
+#pragma push_macro("force_inline")
+#undef force_inline
 #if defined(__clang__) || defined(__GNUC__)
     #define force_inline [[gnu::always_inline]]
 #else
     #define force_inline [[msvc::forceinline]]
 #endif
 
+#pragma push_macro("cpp20_no_unique_address")
+#undef cpp20_no_unique_address
 #if defined(_MSC_VER)
     #define cpp20_no_unique_address [[msvc::no_unique_address]]
 #else
@@ -199,7 +203,7 @@ export namespace opt {
 
     class option_panic : public std::exception {
     public:
-        option_panic(const char *message) noexcept : message{ message } {}
+        explicit option_panic(const char *message) noexcept : message{ message } {}
 
         const char *what() const noexcept override {
             return message;
@@ -1390,7 +1394,6 @@ export namespace opt {
                 throw std::bad_optional_access{};
             }
             return std::forward_like<decltype(self)>(self.storage.get());
-            ;
         }
 
         // https://eel.is/c++draft/optional.observe#lib:value_or,optional
@@ -3471,5 +3474,5 @@ struct std::formatter<opt::option<T>> {
     }
 };
 
-#undef cpp20_no_unique_address
-#undef force_inline
+#pragma pop_macro("cpp20_no_unique_address")
+#pragma pop_macro("force_inline")
