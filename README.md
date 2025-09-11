@@ -39,6 +39,8 @@ static_assert(result_2 == opt::none);
 
 `opt::option` is **fully compatible** with the C++26 draft `std::optional`, but some member functions may change the returned `std::optional` to `opt::option`. You can completely replace `std::optional` with `opt::option` and enjoy richer features and possibly better performance.
 
+`opt::option` passes all STL tests for `std::optional`.
+
 ## `option` and Raw Pointers
 
 C++ raw pointers can be null, which may lead to undefined behavior. `option` can safely wrap raw pointers, but it's recommended to use smart pointers (`std::unique_ptr`, `std::shared_ptr`) when possible.

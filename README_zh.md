@@ -40,6 +40,8 @@ static_assert(result_2 == opt::none);
 
 `opt::option` **完全兼容** C++26 草案的 `std::optional`，但某些成员函数会将返回的 `std::optional` 改为 `opt::option`。你可以将 `std::optional` 完全替换为 `opt::option`，并享受更丰富的功能和也许更好的性能。
 
+`opt::option` 通过了 STL 对 `std::optional` 的所有测试。
+
 
 ## `option` 与原始指针
 
