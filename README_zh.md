@@ -124,7 +124,7 @@ for (int x : values) {
 
 本库采用 `union` 存储机制，支持值类型、引用类型（以指针实现）、`void` 类型（仅表示有无值），并结合 Rust `Option` 语义与 C++26 特性：
 
-- 完善的移动/拷贝语义与完美转发
+- 完善的移动/复制语义与完美转发
 - 丰富的 `constexpr` 支持
 - 显式 `this` 参数（deducing this）
 - 与 `std::expected`、`std::pair` 等标准库类型的集成
