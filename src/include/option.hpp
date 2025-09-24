@@ -223,7 +223,14 @@ namespace opt {
 
     class option_panic : public std::exception {
     public:
-        using std::exception::exception;
+        explicit option_panic(const char *message) : message(message) {}
+        
+        const char *what() const noexcept override {
+            return message;
+        }
+        
+    private:
+        const char *message;
     };
 
     namespace detail {
