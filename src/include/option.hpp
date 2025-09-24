@@ -125,9 +125,17 @@ namespace opt {
     #define force_inline [[msvc::forceinline]]
 #endif
 
+#pragma push_macro("hot_path")
+#undef hot_path
+#if defined(__clang__) || defined(__GNUC__)
+    #define hot_path [[gnu::hot]]
+#else
+    #define hot_path
+#endif
+
 #pragma push_macro("cpp20_no_unique_address")
 #undef cpp20_no_unique_address
-#if defined(_MSC_VER)
+#if __has_cpp_attribute(msvc::no_unique_address)
     #define cpp20_no_unique_address [[msvc::no_unique_address]]
 #else
     #define cpp20_no_unique_address [[no_unique_address]]
@@ -215,30 +223,20 @@ namespace opt {
 
     class option_panic : public std::exception {
     public:
-        explicit option_panic(const char *message) noexcept : message{ message } {}
-
-        const char *what() const noexcept override {
-            return message;
-        }
-
-    private:
-        const char *message;
+        using std::exception::exception;
     };
 
     namespace detail {
-        struct empty_byte {};
-
         template <typename T>
         struct option_storage {
             using stored_type = std::remove_cv_t<T>;
 
             union {
-                empty_byte empty;
                 stored_type value;
             };
             bool has_value_ = false;
 
-            constexpr option_storage() noexcept : empty{} {}
+            constexpr option_storage() noexcept {}
 
             constexpr option_storage(const T &val) noexcept(std::is_nothrow_copy_constructible_v<stored_type>) :
                 value{ val }, has_value_{ true } {}
@@ -256,7 +254,7 @@ namespace opt {
                 }
             }
 
-            constexpr option_storage(const option_storage &other) noexcept
+            constexpr option_storage(const option_storage &) noexcept
                 requires std::is_trivially_copy_constructible_v<stored_type>
             = default;
 
@@ -272,7 +270,7 @@ namespace opt {
                 }
             }
 
-            constexpr option_storage(option_storage &&other) noexcept
+            constexpr option_storage(option_storage &&) noexcept
                 requires std::is_trivially_move_constructible_v<T>
             = default;
 
@@ -287,7 +285,7 @@ namespace opt {
                                                 decltype(std::invoke(std::forward<F>(f), std::forward<Ts>(args)...))>) :
                 value{ std::invoke(std::forward<F>(f), std::forward<Ts>(args)...) }, has_value_{ true } {}
 
-            constexpr option_storage &operator=(const option_storage &other)
+            constexpr option_storage &operator=(const option_storage &)
                 requires (std::is_trivially_copy_assignable_v<T> && std::is_trivially_copy_constructible_v<T>)
             = default;
 
@@ -322,7 +320,7 @@ namespace opt {
                 return *this;
             }
 
-            constexpr option_storage &operator=(option_storage &&other)
+            constexpr option_storage &operator=(option_storage &&)
                 requires (std::is_trivially_move_assignable_v<T> && std::is_trivially_move_constructible_v<T>)
             = default;
 
@@ -427,10 +425,10 @@ namespace opt {
             constexpr option_storage() noexcept = default;
             constexpr option_storage(pointer_t val) noexcept : ptr{ val }, has_value_{ true } {}
 
-            constexpr option_storage(const option_storage &other)            = default;
-            constexpr option_storage(option_storage &&other)                 = default;
-            constexpr option_storage &operator=(const option_storage &other) = default;
-            constexpr option_storage &operator=(option_storage &&other)      = default;
+            constexpr option_storage(const option_storage &)            = default;
+            constexpr option_storage(option_storage &&)                 = default;
+            constexpr option_storage &operator=(const option_storage &) = default;
+            constexpr option_storage &operator=(option_storage &&)      = default;
 
             constexpr option_storage(std::in_place_t, pointer_t val) noexcept : ptr{ val }, has_value_{ true } {}
 
@@ -460,10 +458,10 @@ namespace opt {
             constexpr option_storage() noexcept = default;
             constexpr option_storage(T &val) noexcept : ptr{ &val } {}
 
-            constexpr option_storage(const option_storage &other)            = default;
-            constexpr option_storage(option_storage &&other)                 = default;
-            constexpr option_storage &operator=(const option_storage &other) = default;
-            constexpr option_storage &operator=(option_storage &&other)      = default;
+            constexpr option_storage(const option_storage &)            = default;
+            constexpr option_storage(option_storage &&)                 = default;
+            constexpr option_storage &operator=(const option_storage &) = default;
+            constexpr option_storage &operator=(option_storage &&)      = default;
 
             constexpr T &get() const noexcept {
                 return *ptr;
@@ -724,7 +722,7 @@ namespace opt {
         constexpr auto as_ref() = delete;
 
         constexpr auto expect(const char *msg) const {
-            if (is_none()) {
+            if (is_none()) [[unlikely]] {
                 throw option_panic(msg);
             }
         }
@@ -769,7 +767,7 @@ namespace opt {
             return is_none() || std::invoke(std::forward<F>(f));
         }
 
-        constexpr bool is_some() const noexcept {
+        hot_path constexpr bool is_some() const noexcept {
             return storage.has_value();
         }
 
@@ -782,7 +780,7 @@ namespace opt {
         constexpr auto map(F &&f) const {
             using U = std::remove_cv_t<std::invoke_result_t<F>>;
 
-            if (is_some()) {
+            if (is_some()) [[likely]] {
                 if constexpr (std::same_as<U, void>) {
                     std::invoke(std::forward<F>(f));
                     return option{ true };
@@ -860,7 +858,7 @@ namespace opt {
         }
 
         constexpr auto unwrap() const {
-            if (is_none()) {
+            if (is_none()) [[unlikely]] {
                 throw option_panic("Attempted to access value of empty option");
             }
         }
@@ -1157,7 +1155,7 @@ namespace opt {
         = default;
 
         // https://eel.is/c++draft/optional.optional#lib:operator=,optional__
-        constexpr option &operator=(option &&rhs) noexcept(std::is_nothrow_move_assignable_v<T>
+        constexpr option &operator=(option &&) noexcept(std::is_nothrow_move_assignable_v<T>
                                                            && std::is_nothrow_move_constructible_v<T>)
             requires std::is_move_assignable_v<T> && std::is_move_constructible_v<T>
         = default;
@@ -1377,14 +1375,14 @@ namespace opt {
         }
 
         // https://eel.is/c++draft/optional.observe#lib:operator-%3e,optional
-        constexpr auto operator->(this auto &&self) noexcept {
+        hot_path constexpr auto operator->(this auto &&self) noexcept {
             assert(self.has_value());
             return std::addressof(self.storage.get());
         }
 
         // https://eel.is/c++draft/optional.observe#lib:operator*,optional
         // https://eel.is/c++draft/optional.observe#lib:operator*,optional_
-        constexpr auto &&operator*(this auto &&self) noexcept {
+        hot_path constexpr auto &&operator*(this auto &&self) noexcept {
             assert(self.has_value());
             return std::forward_like<decltype(self)>(self.storage.get());
         }
@@ -1395,7 +1393,7 @@ namespace opt {
         }
 
         // https://eel.is/c++draft/optional.observe#lib:has_value,optional
-        constexpr bool has_value() const noexcept {
+        hot_path constexpr bool has_value() const noexcept {
             return is_some();
         }
 
@@ -1430,7 +1428,7 @@ namespace opt {
 
             static_assert(detail::option_type<U> || detail::specialization_of<std::remove_cvref_t<U>, std::optional>);
 
-            if (self.is_some()) {
+            if (self.is_some()) [[likely]] {
                 auto result = std::invoke(std::forward<F>(f), std::forward_like<decltype(self)>(*self));
                 if constexpr (detail::specialization_of<std::remove_cvref_t<U>, std::optional>) {
                     // Convert std::optional to option for consistency
@@ -1622,7 +1620,7 @@ namespace opt {
         constexpr auto &get_or_insert(this auto &&self, U &&value)
             requires (std::copy_constructible<T> || std::move_constructible<T>) && std::convertible_to<U &&, T>
         {
-            if (self.is_none()) {
+            if (self.is_none()) [[unlikely]] {
                 self.storage.emplace(std::forward_like<decltype(self)>(value));
             }
             return self.storage.get();
@@ -1645,7 +1643,7 @@ namespace opt {
         constexpr auto &get_or_insert_with(this auto &&self, F &&f)
             requires std::constructible_from<T, std::invoke_result_t<F>>
         {
-            if (self.is_none()) {
+            if (self.is_none()) [[unlikely]] {
                 self.storage.emplace(std::invoke(std::forward<F>(f)));
             }
             return self.storage.get();
@@ -1672,7 +1670,7 @@ namespace opt {
         // Returns the original option.
         template <typename F>
         constexpr auto inspect(this auto &&self, F &&f) {
-            if (self.is_some()) {
+            if (self.is_some()) [[likely]] {
                 std::invoke(std::forward<F>(f), self.storage.get());
             }
             return self;
@@ -1692,7 +1690,7 @@ namespace opt {
         }
 
         // Returns `true` if the option contains a value.
-        constexpr bool is_some() const noexcept {
+        hot_path constexpr bool is_some() const noexcept {
             return storage.has_value();
         }
 
@@ -1848,7 +1846,7 @@ namespace opt {
         // Takes the value out of the option, leaving an empty option in its place.
         constexpr auto take(this auto &&self) {
             option result{};
-            if (self.is_some()) {
+            if (self.is_some()) [[likely]] {
                 std::ranges::swap(self.storage, result.storage);
             }
             return result;
@@ -1899,7 +1897,7 @@ namespace opt {
         constexpr auto &&unwrap(this auto &&self)
             requires (!std::same_as<std::remove_cv_t<T>, void>)
         {
-            if (self.is_none()) {
+            if (self.is_none()) [[unlikely]] {
                 throw option_panic("Attempted to access value of empty option");
             }
             return self.storage.get();
@@ -1916,7 +1914,7 @@ namespace opt {
                           ? (std::copy_constructible<T> && std::convertible_to<const U &, T>)
                           : (std::move_constructible<T> && std::convertible_to<U &&, T>))
         {
-            if (self.is_some()) {
+            if (self.is_some()) [[likely]] {
                 return std::forward_like<decltype(self)>(self.unwrap_unchecked());
             }
             return static_cast<T>(std::forward<U>(default_value));
@@ -1929,7 +1927,7 @@ namespace opt {
         constexpr auto unwrap_or_default(this auto &&self)
             requires std::default_initializable<T>
         {
-            if (self.is_some()) {
+            if (self.is_some()) [[likely]] {
                 return std::forward_like<decltype(self)>(self.unwrap_unchecked());
             }
             return T{};
@@ -1949,7 +1947,7 @@ namespace opt {
         }
 
         // Returns the contained value, without checking that the value is not empty.
-        constexpr auto &&unwrap_unchecked(this auto &&self) noexcept {
+        hot_path constexpr auto &&unwrap_unchecked(this auto &&self) noexcept {
             return self.storage.get();
         }
 
@@ -2306,7 +2304,7 @@ namespace opt {
                 storage.convert_ref_init_val(*rhs);
             }
         }
-        constexpr option(const option &rhs) noexcept = default;
+        constexpr option(const option &) noexcept = default;
 
         // https://eel.is/c++draft/optional.ref.ctor#itemdecl:1
         template <class Arg>
@@ -2329,7 +2327,7 @@ namespace opt {
         }
 
         template <class U>
-        constexpr explicit(!std::convertible_to<U, T &>) option(U &&u) noexcept(std::is_nothrow_constructible_v<T &, U>)
+        constexpr explicit(!std::convertible_to<U, T &>) option(U &&) noexcept(std::is_nothrow_constructible_v<T &, U>)
             requires (!std::is_same_v<std::remove_cvref_t<U>, std::optional<T>>)
                       && (!std::is_same_v<std::remove_cvref_t<U>, option>)
                       && (!std::is_same_v<std::remove_cvref_t<U>, std::in_place_t>)
@@ -2352,7 +2350,7 @@ namespace opt {
 
         template <class U>
         constexpr explicit(!std::is_convertible_v<U &, T &>)
-            option(std::optional<U> &rhs) noexcept(std::is_nothrow_constructible_v<T &, U &>)
+            option(std::optional<U> &) noexcept(std::is_nothrow_constructible_v<T &, U &>)
             requires (!std::is_same_v<std::remove_cv_t<T>, std::optional<U>>)
                       && (!std::is_same_v<T &, U>)
                       && std::is_constructible_v<T &, U &>
@@ -2372,7 +2370,7 @@ namespace opt {
         }
 
         template <class U>
-        constexpr explicit(!std::is_convertible_v<U &, T &>) option(option<U> &rhs)
+        constexpr explicit(!std::is_convertible_v<U &, T &>) option(option<U> &)
             requires (!std::is_same_v<std::remove_cv_t<T>, option<U>>)
                       && (!std::is_same_v<T &, U>)
                       && std::is_constructible_v<T &, U &>
@@ -2393,7 +2391,7 @@ namespace opt {
         }
 
         template <class U>
-        constexpr explicit(!std::is_convertible_v<const U &, T &>) option(const std::optional<U> &rhs)
+        constexpr explicit(!std::is_convertible_v<const U &, T &>) option(const std::optional<U> &)
             requires (!std::is_same_v<std::remove_cv_t<T>, std::optional<U>>)
                       && (!std::is_same_v<T &, U>)
                       && std::is_constructible_v<T &, const U &>
@@ -2413,7 +2411,7 @@ namespace opt {
         }
 
         template <class U>
-        constexpr explicit(!std::is_convertible_v<const U &, T &>) option(const option<U> &rhs)
+        constexpr explicit(!std::is_convertible_v<const U &, T &>) option(const option<U> &)
             requires (!std::is_same_v<std::remove_cv_t<T>, option<U>>)
                       && (!std::is_same_v<T &, U>)
                       && std::is_constructible_v<T &, const U &>
@@ -2434,7 +2432,7 @@ namespace opt {
         }
 
         template <class U>
-        constexpr explicit(!std::is_convertible_v<U, T &>) option(std::optional<U> &&rhs)
+        constexpr explicit(!std::is_convertible_v<U, T &>) option(std::optional<U> &&)
             requires (!std::is_same_v<std::remove_cv_t<T>, std::optional<U>>)
                       && (!std::is_same_v<T &, U>)
                       && std::is_constructible_v<T &, U>
@@ -2454,7 +2452,7 @@ namespace opt {
         }
 
         template <class U>
-        constexpr explicit(!std::is_convertible_v<U, T &>) option(option<U> &&rhs)
+        constexpr explicit(!std::is_convertible_v<U, T &>) option(option<U> &&)
             requires (!std::is_same_v<std::remove_cv_t<T>, option<U>>)
                       && (!std::is_same_v<T &, U>)
                       && std::is_constructible_v<T &, U>
@@ -2475,7 +2473,7 @@ namespace opt {
         }
 
         template <class U>
-        constexpr explicit(!std::is_convertible_v<const U, T &>) option(const std::optional<U> &&rhs)
+        constexpr explicit(!std::is_convertible_v<const U, T &>) option(const std::optional<U> &&)
             requires (!std::is_same_v<std::remove_cv_t<T>, std::optional<U>>)
                       && (!std::is_same_v<T &, U>)
                       && std::is_constructible_v<T &, const U>
@@ -2495,7 +2493,7 @@ namespace opt {
         }
 
         template <class U>
-        constexpr explicit(!std::is_convertible_v<const U, T &>) option(const option<U> &&rhs)
+        constexpr explicit(!std::is_convertible_v<const U, T &>) option(const option<U> &&)
             requires (!std::is_same_v<std::remove_cv_t<T>, option<U>>)
                       && (!std::is_same_v<T &, U>)
                       && std::is_constructible_v<T &, const U>
@@ -3486,7 +3484,8 @@ struct std::formatter<opt::option<T>> {
     }
 };
 
-#pragma pop_macro("cpp20_no_unique_address")
 #pragma pop_macro("force_inline")
+#pragma pop_macro("hot_path")
+#pragma pop_macro("cpp20_no_unique_address")
 
 #endif

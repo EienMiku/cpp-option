@@ -32,6 +32,8 @@ target("bench_gcc")
     add_packages("benchmark")
     set_optimize("fastest")
     set_toolchains("gcc")
+    add_cxxflags("-fno-exceptions", "-fno-rtti", "-march=native", "-mtune=native", "-flto")
+    add_ldflags("-flto")
     set_encodings("source:utf-8", "target:utf-8")
 
 target("bench_debug_opt_gcc")
