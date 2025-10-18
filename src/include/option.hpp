@@ -2699,7 +2699,7 @@ namespace opt {
             return option<pointee_type &>{};
         }
 
-        // Converts from `option<T&>` to `option<T&>`.
+        // Converts from `option<T> &` to `option<T&>`.
         // (Creates an option holding a reference to the original value.)
         constexpr auto as_mut() noexcept {
             if (is_some()) {
