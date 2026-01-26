@@ -33,9 +33,9 @@ target("test_unit_clang")
     set_encodings("source:utf-8", "target:utf-8")
 
 -- Please run this target with optimal environment if you like
--- target("test_unit_v2_clang")
+-- target("test_unit_full_clang")
 --     set_kind("binary")
---     add_files("src/test_unit_v2.cpp")
+--     add_files("src/test_unit_full.cpp")
 --     add_includedirs("src/include")
 --     add_includedirs("external/llvm-project/libcxx/test/support")
 --     add_cxxflags("-stdlib=libc++")
