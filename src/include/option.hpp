@@ -915,28 +915,28 @@ namespace opt {
             }
         }
 
-        constexpr auto max(const option &other) const noexcept {
+        constexpr auto (max)(const option &other) const noexcept {
             if (is_some() && other.is_some()) {
                 return *this;
             }
             return is_some() ? *this : other;
         }
 
-        constexpr auto max(option &&other) const noexcept {
+        constexpr auto (max)(option &&other) const noexcept {
             if (is_some() && other.is_some()) {
                 return *this;
             }
             return is_some() ? *this : other;
         }
 
-        constexpr auto min(const option &other) const noexcept {
+        constexpr auto (min)(const option &other) const noexcept {
             if (is_some() && other.is_some()) {
                 return *this;
             }
             return is_none() ? *this : other;
         }
 
-        constexpr auto min(option &&other) const noexcept {
+        constexpr auto (min)(option &&other) const noexcept {
             if (is_some() && other.is_some()) {
                 return *this;
             }
@@ -2125,7 +2125,7 @@ namespace opt {
         // If both options contain values, returns the option with the greater value.
         // If only one option contains a value, returns that option.
         // If both are empty, returns an empty option.
-        constexpr auto max(this auto &&self, const option<T> &other) noexcept(noexcept(static_cast<bool>(self > other)))
+        constexpr auto (max)(this auto &&self, const option<T> &other) noexcept(noexcept(static_cast<bool>(self > other)))
             requires std::three_way_comparable<T>
         {
             if (self.is_some() && other.is_some()) {
@@ -2134,7 +2134,7 @@ namespace opt {
             return self.is_some() ? self : other;
         }
 
-        constexpr auto max(this auto &&self, option<T> &&other) noexcept(noexcept(static_cast<bool>(self > other)))
+        constexpr auto (max)(this auto &&self, option<T> &&other) noexcept(noexcept(static_cast<bool>(self > other)))
             requires std::three_way_comparable<T>
         {
             if (self.is_some() && other.is_some()) {
@@ -2148,7 +2148,7 @@ namespace opt {
         // If both options contain values, returns the option with the smaller value.
         // If only one option is empty, returns that option.
         // If both are empty, returns an empty option.
-        constexpr auto min(this auto &&self, const option<T> &other) noexcept(noexcept(static_cast<bool>(self < other)))
+        constexpr auto (min)(this auto &&self, const option<T> &other) noexcept(noexcept(static_cast<bool>(self < other)))
             requires std::three_way_comparable<T>
         {
             if (self.is_some() && other.is_some()) {
@@ -2157,7 +2157,7 @@ namespace opt {
             return self.is_none() ? self : other;
         }
 
-        constexpr auto min(this auto &&self, option<T> &&other) noexcept(noexcept(static_cast<bool>(self < other)))
+        constexpr auto (min)(this auto &&self, option<T> &&other) noexcept(noexcept(static_cast<bool>(self < other)))
             requires std::three_way_comparable<T>
         {
             if (self.is_some() && other.is_some()) {
@@ -2197,10 +2197,10 @@ namespace opt {
         {
             if (self.is_some()) {
                 if (min.is_some() && self < min) {
-                    return std::move(min);
+                    return min;
                 }
                 if (max.is_some() && self > max) {
-                    return std::move(max);
+                    return max;
                 }
                 return self;
             }
@@ -2608,10 +2608,10 @@ namespace opt {
 
         // https://eel.is/c++draft/optional.ref.observe#itemdecl:6
         template <class U = std::remove_cv_t<T>>
-        constexpr std::remove_cv_t<T> value_or(U &&u) const {
+        constexpr std::decay_t<T> value_or(U &&u) const {
             static_assert(std::is_constructible_v<std::remove_cv_t<T>, T &>
                           && std::is_convertible_v<U, std::remove_cv_t<T>>);
-            return is_some() ? storage.get() : static_cast<std::remove_cv_t<T>>(std::forward<U>(u));
+            return is_some() ? storage.get() : static_cast<std::decay_t<T>>(std::forward<U>(u));
         }
 
         // https://eel.is/c++draft/optional.ref.monadic#itemdecl:1
@@ -2904,10 +2904,10 @@ namespace opt {
         }
 
         template <class U = std::remove_cv_t<T>>
-        constexpr std::remove_cv_t<T> unwrap_or(U &&u) const {
+        constexpr std::decay_t<T> unwrap_or(U &&u) const {
             static_assert(std::is_constructible_v<std::remove_cv_t<T>, T &>
                           && std::is_convertible_v<U, std::remove_cv_t<T>>);
-            return is_some() ? storage.get() : static_cast<std::remove_cv_t<T>>(std::forward<U>(u));
+            return is_some() ? storage.get() : static_cast<std::decay_t<T>>(std::forward<U>(u));
         }
 
         constexpr auto unwrap_or_default() const
