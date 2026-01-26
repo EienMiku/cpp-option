@@ -1,0 +1,108 @@
+export module option:fwd;
+
+import std;
+
+export namespace opt {
+    struct none_t;
+
+    namespace detail {
+        template <typename T>
+        concept option_prohibited_type = (std::same_as<std::remove_cvref_t<T>, none_t>)
+                                      || (std::same_as<std::remove_cvref_t<T>, std::nullopt_t>)
+                                      || (std::same_as<std::remove_cvref_t<T>, std::in_place_t>)
+                                      || (std::is_array_v<T>)
+                                      || std::is_rvalue_reference_v<T>;
+    } // namespace detail
+
+    template <typename T>
+        requires (!detail::option_prohibited_type<T>)
+    class option;
+
+    namespace detail {
+        template <typename T, template <typename...> typename Template>
+        inline constexpr bool is_specialization_of_v = false;
+
+        template <template <typename...> class Template, typename... Ts>
+        inline constexpr bool is_specialization_of_v<Template<Ts...>, Template> = true;
+
+        template <typename T, template <typename...> class Template>
+        concept specialization_of = is_specialization_of_v<T, Template>;
+
+        template <typename T>
+        concept expected_type = specialization_of<std::remove_cv_t<T>, std::expected>;
+
+        template <typename T>
+        concept pair_type = specialization_of<std::remove_cvref_t<T>, std::pair>;
+
+        template <typename T>
+        concept option_type = specialization_of<std::remove_cvref_t<T>, option>;
+
+        template <typename T>
+        concept option_like = option_type<T>
+                           || std::same_as<std::remove_cvref_t<T>, none_t>
+                           || std::same_as<std::remove_cvref_t<T>, std::nullopt_t>;
+
+        template <typename T>
+        concept has_clone = requires(const T &t) {
+            { t.clone() } -> std::convertible_to<T>;
+        };
+
+        template <typename T>
+        concept cloneable = has_clone<T> || std::is_trivially_copyable_v<T>;
+
+        template <typename T>
+        concept noexcept_cloneable = requires(const T &v) {
+            { v.clone() } noexcept;
+        } || (std::is_trivially_copyable_v<T> && std::is_nothrow_copy_constructible_v<T>);
+
+        template <cloneable T>
+        constexpr T clone_value(const T &value) noexcept(noexcept_cloneable<T>) {
+            if constexpr (has_clone<T>) {
+                return value.clone();
+            } else {
+                static_assert(
+                    std::is_trivially_copyable_v<T>,
+                    "Type must either have a .clone() member function or be trivially copyable, because it is "
+                    "impossible to determine whether a user-defined copy constructor performs a deep copy.");
+                return value;
+            }
+        }
+
+        struct within_invoke_t {
+            constexpr explicit within_invoke_t() = default;
+        };
+
+        inline constexpr within_invoke_t within_invoke{};
+
+        // https://eel.is/c++draft/optional.ctor#1
+        template <typename T, typename W>
+        concept converts_from_any_cvref = std::constructible_from<T, W &>
+                                       || std::convertible_to<W &, T>
+                                       || std::constructible_from<T, W>
+                                       || std::convertible_to<W, T>
+                                       || std::constructible_from<T, const W &>
+                                       || std::convertible_to<const W &, T>
+                                       || std::constructible_from<T, const W>
+                                       || std::convertible_to<const W, T>;
+
+        inline namespace swap {
+            using std::swap;
+
+            template <typename T>
+            concept cpp17_swappable = requires(T &a, T &b) { requires requires() { swap(a, b); }; };
+        } // namespace swap
+
+#if defined(__cpp_lib_reference_from_temporary) && __cpp_lib_reference_from_temporary >= 202202L
+        template <class T, class U>
+        inline constexpr bool cpp23_reference_constructs_from_temporary_v =
+            std::reference_constructs_from_temporary_v<T, U>;
+#elif defined(__clang__) && __has_builtin(__reference_constructs_from_temporary)
+        template <class T, class U>
+        inline constexpr bool cpp23_reference_constructs_from_temporary_v = __reference_constructs_from_temporary(T, U);
+#else
+        // Fallback
+        template <class T, class U>
+        inline constexpr bool cpp23_reference_constructs_from_temporary_v = false;
+#endif
+    } // namespace detail
+} // namespace opt
