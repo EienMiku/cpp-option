@@ -16,6 +16,9 @@ export namespace opt {
     namespace detail {
         template <class T>
         concept is_derived_from_optional = requires(const T &t) { []<class U>(const option<U> &) {}(t); };
+
+        inline constexpr struct {
+        } prevent_explicit_barrier;
     } // namespace detail
 
     // https://eel.is/c++draft/optional.nullopt#lib:nullopt_t
@@ -84,8 +87,10 @@ export namespace opt {
     }
 
     template <typename T, typename U>
-    constexpr bool operator==(const option<T> &x, const option<U> &y) noexcept
-        requires std::same_as<std::remove_cv_t<T>, void> && std::same_as<std::remove_cv_t<U>, void>
+    constexpr bool operator!=(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x != *y)))
+        requires std::same_as<std::remove_cv_t<T>, void> && std::same_as<std::remove_cv_t<U>, void> && requires {
+            { *x != *y } -> std::convertible_to<bool>;
+        }
     {
         if (x.has_value() != y.has_value()) {
             return false;
@@ -95,7 +100,11 @@ export namespace opt {
 
     // https://eel.is/c++draft/optional.relops#lib:operator%3c,optional
     template <class T, class U>
-    constexpr bool operator<(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x < *y))) {
+    constexpr bool operator<(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x < *y)))
+        requires requires {
+            { *x < *y } -> std::convertible_to<bool>;
+        }
+    {
         if (!y) {
             return false;
         } else if (!x) {
@@ -107,7 +116,11 @@ export namespace opt {
 
     // https://eel.is/c++draft/optional.relops#lib:operator%3e,optional
     template <class T, class U>
-    constexpr bool operator>(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x > *y))) {
+    constexpr bool operator>(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x > *y)))
+        requires requires {
+            { *x > *y } -> std::convertible_to<bool>;
+        }
+    {
         if (!x) {
             return false;
         } else if (!y) {
@@ -119,7 +132,11 @@ export namespace opt {
 
     // https://eel.is/c++draft/optional.relops#lib:operator%3c=,optional
     template <class T, class U>
-    constexpr bool operator<=(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x <= *y))) {
+    constexpr bool operator<=(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x <= *y)))
+        requires requires {
+            { *x <= *y } -> std::convertible_to<bool>;
+        }
+    {
         if (!x) {
             return true;
         } else if (!y) {
@@ -131,7 +148,11 @@ export namespace opt {
 
     // https://eel.is/c++draft/optional.relops#lib:operator%3e=,optional
     template <class T, class U>
-    constexpr bool operator>=(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x >= *y))) {
+    constexpr bool operator>=(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x >= *y)))
+        requires requires {
+            { *x >= *y } -> std::convertible_to<bool>;
+        }
+    {
         if (!y) {
             return true;
         } else if (!x) {
@@ -208,151 +229,179 @@ export namespace opt {
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator==,optional
     template <class T, class U>
     constexpr bool operator==(const option<T> &x, const U &v) noexcept(noexcept(static_cast<bool>(*x == v)))
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { *x == v } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { *x == v } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? *x == v : false;
+        // LWG 4370
+        // return x.has_value() ? *x == v : false;
+        if (x.has_value())
+            return *x == v;
+        return false;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator==,optional_
     template <class T, class U>
     constexpr bool operator==(const T &v, const option<U> &x) noexcept(noexcept(static_cast<bool>(v == *x)))
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { v == *x } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { v == *x } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? v == *x : false;
+        // LWG 4370
+        // return x.has_value() ? v == *x : false;
+        if (x.has_value())
+            return v == *x;
+        return false;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator!=,optional
     template <class T, class U>
     constexpr bool operator!=(const option<T> &x, const U &v) noexcept(noexcept(static_cast<bool>(*x != v)))
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { *x != v } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { *x != v } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? *x != v : true;
+        // LWG 4370
+        // return x.has_value() ? *x != v : true;
+        if (x.has_value())
+            return *x != v;
+        return true;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator!=,optional_
     template <class T, class U>
     constexpr bool operator!=(const T &v, const option<U> &x) noexcept(noexcept(static_cast<bool>(v != *x)))
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { v != *x } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { v != *x } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? v != *x : true;
+        // LWG 4370
+        // return x.has_value() ? v != *x : true;
+        if (x.has_value())
+            return v != *x;
+        return true;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3c,optional
     template <class T, class U>
     constexpr bool operator<(const option<T> &x, const U &v)
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { *x < v } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { *x < v } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? *x < v : true;
+        // LWG 4370
+        // return x.has_value() ? *x < v : true;
+        if (x.has_value())
+            return *x < v;
+        return true;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3c,optional_
     template <class T, class U>
     constexpr bool operator<(const T &v, const option<U> &x)
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { v < *x } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { v < *x } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? v < *x : false;
+        // LWG 4370
+        // return x.has_value() ? v < *x : false;
+        if (x.has_value())
+            return v < *x;
+        return false;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3e,optional
     template <class T, class U>
     constexpr bool operator>(const option<T> &x, const U &v)
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { *x > v } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { *x > v } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? *x > v : false;
+        // LWG 4370
+        // return x.has_value() ? *x > v : false;
+        if (x.has_value())
+            return *x > v;
+        return false;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3e,optional_
     template <class T, class U>
     constexpr bool operator>(const T &v, const option<U> &x)
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { v > *x } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { v > *x } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? v > *x : true;
+        // LWG 4370
+        // return x.has_value() ? v > *x : true;
+        if (x.has_value())
+            return v > *x;
+        return true;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3c=,optional
     template <class T, class U>
     constexpr bool operator<=(const option<T> &x, const U &v)
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { *x <= v } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { *x <= v } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? *x <= v : true;
+        // LWG 4370
+        // return x.has_value() ? *x <= v : true;
+        if (x.has_value())
+            return *x <= v;
+        return true;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3c=,optional_
     template <class T, class U>
     constexpr bool operator<=(const T &v, const option<U> &x)
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { v <= *x } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { v <= *x } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? v <= *x : false;
+        // LWG 4370
+        // return x.has_value() ? v <= *x : false;
+        if (x.has_value())
+            return v <= *x;
+        return false;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3e=,optional
     template <class T, class U>
     constexpr bool operator>=(const option<T> &x, const U &v)
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { *x >= v } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { *x >= v } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? *x >= v : false;
+        // LWG 4370
+        // return x.has_value() ? *x >= v : false;
+        if (x.has_value())
+            return *x >= v;
+        return false;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3e=,optional_
     template <class T, class U>
     constexpr bool operator>=(const T &v, const option<U> &x)
-        requires (!detail::specialization_of<U, std::optional>)
-              && (!detail::specialization_of<U, option>)
-              && requires {
-                     { v >= *x } -> std::convertible_to<bool>;
-                 }
+        requires (!detail::specialization_of<U, std::optional>) && (!detail::specialization_of<U, option>) && requires {
+            { v >= *x } -> std::convertible_to<bool>;
+        }
     {
-        return x.has_value() ? v >= *x : true;
+        // LWG 4370
+        // return x.has_value() ? v >= *x : true;
+        if (x.has_value())
+            return v >= *x;
+        return true;
     }
 
     // https://eel.is/c++draft/optional.comp.with.t#lib:operator%3c=%3e,optional
     template <class T, class U>
     constexpr std::compare_three_way_result_t<T, U> operator<=>(const option<T> &x, const U &v)
-        requires (!detail::is_derived_from_optional<U>) && std::three_way_comparable_with<T, U>
+        requires (!detail::is_derived_from_optional<U>)
+              // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104606
+              // prevent recursive `<=>` checks
+              && requires { typename std::compare_three_way_result_t<T, U>; }
+              && std::three_way_comparable_with<T, U>
     {
         return x.has_value() ? (*x <=> v) : std::strong_ordering::less;
     }
@@ -380,7 +429,12 @@ export namespace opt {
     }
 
     // https://eel.is/c++draft/optional.specalg#lib:make_optional
-    template <class T>
+    // constraint:
+    //   The call to make_option does not use an explicit template-argument-list
+    //   that begins with a type template-argument.
+    // impl with type of private type constant, from libsrdcxx (int = 0)
+    // template <decltype([] {}) = {}, class T>  | Clang bug, related to #118241
+    template <auto = detail::prevent_explicit_barrier, class T>
     constexpr option<std::decay_t<T>> make_option(T &&v) noexcept(
         std::is_nothrow_constructible_v<option<std::decay_t<T>>, T>)
         requires (std::is_constructible_v<std::decay_t<T>, T>)
@@ -389,17 +443,21 @@ export namespace opt {
     }
 
     template <class T, class... Args>
-    constexpr option<T> make_option(Args &&...args) noexcept(std::is_nothrow_constructible_v<T, Args...>) {
+    constexpr option<T> make_option(Args &&...args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
+        requires std::is_constructible_v<T, Args...>
+    {
         return option<T>(std::in_place, std::forward<Args>(args)...);
     }
 
     template <class T, class U, class... Args>
     constexpr option<T> make_option(std::initializer_list<U> il, Args &&...args) noexcept(
-        std::is_nothrow_constructible_v<T, std::initializer_list<U> &, Args...>) {
+        std::is_nothrow_constructible_v<T, std::initializer_list<U> &, Args...>)
+        requires std::is_constructible_v<T, std::initializer_list<U> &, Args...>
+    {
         return option<T>(std::in_place, il, std::forward<Args>(args)...);
     }
 
-    template <typename T>
+    template <decltype([] {}) = {}, class T>
     constexpr option<std::decay_t<T>> some(T &&value) noexcept(
         std::is_nothrow_constructible_v<option<std::decay_t<T>>, T &&>)
         requires (!detail::specialization_of<std::decay_t<T>, std::reference_wrapper>)
@@ -427,7 +485,7 @@ export namespace opt {
 
     template <typename T, typename... Ts>
     constexpr option<T> some(Ts &&...args) noexcept(std::is_nothrow_constructible_v<T, Ts &&...>)
-        requires std::constructible_from<T, Ts &&...> && (!detail::option_prohibited_type<T>)
+        requires std::constructible_from<T, Ts...>
     {
         return option<T>{ std::in_place, T(std::forward<Ts>(args)...) };
     }
@@ -435,7 +493,7 @@ export namespace opt {
     template <typename T, typename U, typename... Ts>
     constexpr option<T> some(std::initializer_list<U> il, Ts &&...args) noexcept(
         std::is_nothrow_constructible_v<option<T>, std::initializer_list<U> &, Ts &&...>)
-        requires std::constructible_from<T, std::initializer_list<U>, Ts &&...> && (!detail::option_prohibited_type<T>)
+        requires std::constructible_from<T, std::initializer_list<U>, Ts...>
     {
         return option<T>{ std::in_place, il, std::forward<Ts>(args)... };
     }

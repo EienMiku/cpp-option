@@ -7,15 +7,14 @@ export namespace opt {
 
     namespace detail {
         template <typename T>
-        concept option_prohibited_type = (std::same_as<std::remove_cvref_t<T>, none_t>)
-                                      || (std::same_as<std::remove_cvref_t<T>, std::nullopt_t>)
-                                      || (std::same_as<std::remove_cvref_t<T>, std::in_place_t>)
-                                      || (std::is_array_v<T>)
-                                      || std::is_rvalue_reference_v<T>;
+        concept option_prohibited_type = !(std::is_lvalue_reference_v<T>
+                                           || (std::is_object_v<T> && std::is_destructible_v<T> && !std::is_array_v<T>))
+                                      || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, none_t>
+                                      || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::nullopt_t>
+                                      || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::in_place_t>;
     } // namespace detail
 
     template <typename T>
-        requires (!detail::option_prohibited_type<T>)
     class option;
 
     namespace detail {
@@ -104,5 +103,23 @@ export namespace opt {
         template <class T, class U>
         inline constexpr bool cpp23_reference_constructs_from_temporary_v = false;
 #endif
+
+#pragma push_macro("has_cpp_lib_optional_ref")
+#if (defined(__cpp_lib_optional) && __cpp_lib_optional >= 202506L)                                                     \
+    || (defined(__cpp_lib_freestanding_optional) && __cpp_lib_freestanding_optional >= 202506L)
+    #define has_cpp_lib_optional_ref 1
+#else
+    #define has_cpp_lib_optional_ref 0
+#endif
+
+        template <typename U, typename T>
+        concept non_std_optional_of =
+#if has_cpp_lib_optional_ref
+            !std::same_as<std::remove_cvref_t<U>, std::optional<T>>;
+#else
+            true;
+#endif
     } // namespace detail
 } // namespace opt
+
+#pragma pop_macro("has_cpp_lib_optional_ref")
