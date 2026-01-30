@@ -27,6 +27,7 @@ import :none;
 #endif
 
 #pragma push_macro("has_cpp_lib_optional_ref")
+#undef has_cpp_lib_optional_ref
 #if (defined(__cpp_lib_optional) && __cpp_lib_optional >= 202506L)                                                     \
     || (defined(__cpp_lib_freestanding_optional) && __cpp_lib_freestanding_optional >= 202506L)
     #define has_cpp_lib_optional_ref 1
@@ -1727,6 +1728,9 @@ export namespace opt {
         constexpr auto as_pin_mut()   = delete;
         constexpr auto as_pin_ref()   = delete;
         constexpr auto as_slice()     = delete;
+        constexpr auto as_span(this auto &&self) {
+            return std::span{ self.begin(), self.has_value() };
+        }
         auto iter()                   = delete;
         auto iter_mut()               = delete;
         static auto from_iter()       = delete;
