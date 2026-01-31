@@ -1608,7 +1608,7 @@ namespace opt {
         // Returns the contained value.
         //
         // Throws if the option is empty with a custom message provided by `msg`.
-        constexpr auto expect(const char *msg) const {
+        constexpr auto &&expect(const char *msg) const {
             if (is_none()) {
                 throw option_panic(msg);
             }
@@ -2810,7 +2810,7 @@ namespace opt {
             return option<std::remove_cvref_t<T>>{};
         }
 
-        constexpr auto expect(const char *msg) const {
+        constexpr auto &&expect(const char *msg) const {
             if (is_none()) {
                 throw option_panic(msg);
             }
@@ -2990,8 +2990,7 @@ namespace opt {
             if (is_some()) {
                 return storage.get();
             } else {
-                static std::remove_reference_t<T> default_value{};
-                return static_cast<T &>(default_value);
+                return std::remove_reference_t<T>{};
             }
         }
 
