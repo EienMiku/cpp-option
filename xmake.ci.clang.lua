@@ -5,7 +5,7 @@ set_languages("clatest", "cxxlatest")
 
 add_requires("gtest", {
     configs = {
-        cxx_compiler = "clang++-20",
+        cxx_compiler = "clang++",
         cxxflags = "-stdlib=libc++",
         ldflags = "-stdlib=libc++"
     },
@@ -13,7 +13,7 @@ add_requires("gtest", {
 })
 add_requires("benchmark", {
     configs = {
-        cxx_compiler = "clang++-20",
+        cxx_compiler = "clang++",
         cxxflags = "-stdlib=libc++",
         ldflags = "-stdlib=libc++"
     },
@@ -27,7 +27,7 @@ target("test_unit_clang")
     add_files("src/test_unit.cpp")
     add_packages("gtest")
     add_includedirs("src/include")
-    set_toolchains("clang-20")
+    set_toolchains("clang")
     set_runtimes("c++_static")
     add_cxxflags("-stdlib=libc++")
     set_encodings("source:utf-8", "target:utf-8")
@@ -47,7 +47,7 @@ target("bench_clang")
     add_includedirs("src/include")
     add_packages("benchmark")
     set_optimize("fastest")
-    set_toolchains("clang-20")
+    set_toolchains("clang")
     set_runtimes("c++_static")
     add_cxxflags("-stdlib=libc++")
     set_encodings("source:utf-8", "target:utf-8")
@@ -59,7 +59,7 @@ target("bench_debug_opt_clang")
     add_packages("benchmark")
     set_optimize("fastest")
     set_symbols("debug")
-    set_toolchains("clang-20")
+    set_toolchains("clang")
     set_runtimes("c++_static")
-    add_cxxflags("-stdlib=libc++")
+    add_cxxflags("-stdlib=libc++", "-march=x86-64-v3", "-mtune=generic")
     set_encodings("source:utf-8", "target:utf-8")
