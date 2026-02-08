@@ -2,6 +2,7 @@ add_rules("mode.debug", "mode.release")
 add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
 
 set_languages("clatest", "cxxlatest")
+add_ldflags("-lc++abi", {force = true})
 
 add_requires("gtest", {
     configs = {
