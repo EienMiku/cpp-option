@@ -73,30 +73,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install LLVM 22 from apt.llvm.org
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build
-
-      - name: Build LLVM trunk from source
-        run: |
-          git clone --depth 1 https://github.com/llvm/llvm-project.git
-          cd llvm-project
-          cmake -S llvm -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_ENABLE_PROJECTS="clang;lld" \
-            -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
-            -DCMAKE_INSTALL_PREFIX=$HOME/llvm-install \
-            -DLLVM_TARGETS_TO_BUILD="X86" \
-            -DLLVM_INCLUDE_TESTS=OFF \
-            -DLLVM_INCLUDE_BENCHMARKS=OFF \
-            -DLLVM_INCLUDE_EXAMPLES=OFF
-          cmake --build build -j$(nproc) --target install
-          echo "$HOME/llvm-install/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=$HOME/llvm-install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-
-      - name: Verify Clang version
-        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22 all
           clang --version
           clang++ --version
           lld --version
