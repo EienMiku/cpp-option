@@ -108,7 +108,7 @@ namespace opt {
         template <class T, class U>
         inline constexpr bool cpp23_reference_constructs_from_temporary_v =
             std::reference_constructs_from_temporary_v<T, U>;
-#elif defined(__clang__) && __has_builtin(__reference_constructs_from_temporary)
+#elif defined(__clang__) && defined(__has_builtin) && __has_builtin(__reference_constructs_from_temporary)
         template <class T, class U>
         inline constexpr bool cpp23_reference_constructs_from_temporary_v = __reference_constructs_from_temporary(T, U);
 #else
