@@ -86,10 +86,9 @@ jobs:
           LLVM_DIR="$(pwd)/llvm-22"
           echo "$LLVM_DIR/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=$LLVM_DIR/lib:$LLVM_DIR/lib/x86_64-unknown-linux-gnu:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "CXXFLAGS=-stdlib=libc++ -I$LLVM_DIR/include/c++/v1" >> $GITHUB_ENV
-          echo "LDFLAGS=-stdlib=libc++ -fuse-ld=lld -L$LLVM_DIR/lib -L$LLVM_DIR/lib/x86_64-unknown-linux-gnu -lc++abi -Wl,-rpath,$LLVM_DIR/lib -Wl,-rpath,$LLVM_DIR/lib/x86_64-unknown-linux-gnu" >> $GITHUB_ENV
           echo "CC=clang" >> $GITHUB_ENV
           echo "CXX=clang++" >> $GITHUB_ENV
+          sudo ln -sf "$LLVM_DIR/bin/ld.lld" /usr/bin/ld
 
       - name: Verify Clang version
         run: |
