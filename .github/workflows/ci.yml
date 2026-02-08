@@ -73,11 +73,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM 22 from apt.llvm.org
+      - name: Install LLVM 22 from GitHub releases
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 22 all
+          wget https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.0-rc2/LLVM-22.1.0-rc2-Linux-X64.tar.xz
+          tar xf LLVM-22.1.0-rc2-Linux-X64.tar.xz
+          echo "$(pwd)/LLVM-22.1.0-rc2-Linux-X64/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=$(pwd)/LLVM-22.1.0-rc2-Linux-X64/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+      - name: Verify Clang version
+        run: |
           clang --version
           clang++ --version
           lld --version
