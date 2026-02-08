@@ -73,12 +73,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+
       - name: Install LLVM 22 from GitHub releases
         run: |
           wget https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.0-rc2/LLVM-22.1.0-rc2-Linux-X64.tar.xz
           tar xf LLVM-22.1.0-rc2-Linux-X64.tar.xz
-          echo "$(pwd)/LLVM-22.1.0-rc2-Linux-X64/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=$(pwd)/LLVM-22.1.0-rc2-Linux-X64/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          LLVM_DIR="$(pwd)/LLVM-22.1.0-rc2-Linux-X64"
+          echo "$LLVM_DIR/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=$LLVM_DIR/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "CXXFLAGS=-stdlib=libc++ -I$LLVM_DIR/include/c++/v1" >> $GITHUB_ENV
+          echo "LDFLAGS=-stdlib=libc++ -L$LLVM_DIR/lib -Wl,-rpath,$LLVM_DIR/lib" >> $GITHUB_ENV
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
 
       - name: Verify Clang version
         run: |
