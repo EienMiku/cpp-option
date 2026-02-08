@@ -114,17 +114,36 @@ jobs:
             build/linux/*/release/test_unit_clang
           if-no-files-found: warn
 
-  # it seems that msvc does not support the ftm of deducing this while cppreference says it is supported
-  # msvc-bench:
-  #   runs-on: windows-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Install xmake
-  #       uses: xmake-io/github-action-setup-xmake@v1
-  #     - name: Build and run unit test & benchmark (MSVC)
-  #       run: |
-  #         xmake require --yes gtest benchmark
-  #         xmake f --toolchain=msvc --file=xmake.ci.windows.lua
-  #         xmake --yes --file=xmake.ci.windows.lua
-  #         xmake run test_unit_msvc
-  #         xmake run bench_msvc
+  msvc-bench:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Visual Studio 2026 Preview Build Tools
+        shell: pwsh
+        run: |
+          Write-Host "Installing VS 2026 Preview Build Tools..."
+          choco install visualstudio2026buildtools `
+            --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --includeRecommended --quiet" `
+            -y --ignore-package-exit-codes=3010
+          Write-Host "VS 2026 Build Tools installation completed"
+
+      - name: Install xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+
+      - name: Build and run unit test & benchmark (MSVC)
+        run: |
+          xmake config --mode=release
+          xmake f --toolchain=msvc[vs=2026] --file=xmake.ci.windows.lua --yes
+          xmake --yes --file=xmake.ci.windows.lua
+          xmake run test_unit_msvc
+          xmake run bench_msvc
+
+      - name: Upload MSVC artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: msvc-binaries
+          path: |
+            build/windows/*/release/bench_msvc.exe
+            build/windows/*/release/test_unit_msvc.exe
+          if-no-files-found: warn
