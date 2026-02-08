@@ -84,7 +84,7 @@ jobs:
         run: |
           clang --version
           clang++ --version
-          lld --version
+          ld.lld --version
 
       - name: Install xmake
         uses: xmake-io/github-action-setup-xmake@v1
