@@ -19,10 +19,10 @@ export namespace opt {
 
     namespace detail {
         template <typename T, template <typename...> typename Template>
-        inline constexpr bool is_specialization_of_v = false;
+        constexpr bool is_specialization_of_v = false;
 
         template <template <typename...> class Template, typename... Ts>
-        inline constexpr bool is_specialization_of_v<Template<Ts...>, Template> = true;
+        constexpr bool is_specialization_of_v<Template<Ts...>, Template> = true;
 
         template <typename T, template <typename...> class Template>
         concept specialization_of = is_specialization_of_v<T, Template>;
@@ -93,15 +93,15 @@ export namespace opt {
 
 #if defined(__cpp_lib_reference_from_temporary) && __cpp_lib_reference_from_temporary >= 202202L
         template <class T, class U>
-        inline constexpr bool cpp23_reference_constructs_from_temporary_v =
+        constexpr bool cpp23_reference_constructs_from_temporary_v =
             std::reference_constructs_from_temporary_v<T, U>;
 #elif defined(__clang__) && defined(__has_builtin) && __has_builtin(__reference_constructs_from_temporary)
         template <class T, class U>
-        inline constexpr bool cpp23_reference_constructs_from_temporary_v = __reference_constructs_from_temporary(T, U);
+        constexpr bool cpp23_reference_constructs_from_temporary_v = __reference_constructs_from_temporary(T, U);
 #else
         // Fallback
         template <class T, class U>
-        inline constexpr bool cpp23_reference_constructs_from_temporary_v = false;
+        constexpr bool cpp23_reference_constructs_from_temporary_v = false;
 #endif
 
 #pragma push_macro("has_cpp_lib_optional_ref")
