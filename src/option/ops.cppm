@@ -70,6 +70,17 @@ export namespace opt {
         }
     }
 
+    template <class T, class U>
+    constexpr bool operator==(const option<T> &x, const option<U> &y) noexcept
+        requires std::is_void_v<T> && std::is_void_v<U>
+    {
+        if (x.has_value() != y.has_value()) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
     // https://eel.is/c++draft/optional.relops#lib:operator!=,optional
     template <class T, class U>
     constexpr bool operator!=(const option<T> &x, const option<U> &y) noexcept(noexcept(static_cast<bool>(*x != *y)))
@@ -531,13 +542,12 @@ export template <typename T>
     requires opt::detail::hash_enabled<std::remove_const_t<T>> || std::same_as<std::remove_cv_t<T>, void>
 struct std::hash<opt::option<T>> {
     std::size_t operator()(const opt::option<T> &o) const
-        noexcept(noexcept(std::hash<std::remove_const_t<T>>()(o.unwrap_unchecked()))
-                 || std::same_as<std::remove_cv_t<T>, void>) {
+        noexcept(noexcept(std::hash<std::remove_const_t<T>>()(*o)) || std::same_as<std::remove_cv_t<T>, void>) {
         if (o.is_some()) {
             if constexpr (std::same_as<std::remove_cv_t<T>, void>) {
                 return 1;
             } else {
-                return std::hash<std::remove_const_t<T>>()(o.unwrap_unchecked());
+                return std::hash<std::remove_const_t<T>>()(*o);
             }
         }
         return opt::detail::unspecified_hash_value;
@@ -558,7 +568,7 @@ struct std::formatter<opt::option<T>> {
             return std::format_to(ctx.out(), "none");
         } else {
             if (opt.is_some()) {
-                return std::format_to(ctx.out(), "some({})", opt.unwrap_unchecked());
+                return std::format_to(ctx.out(), "some({})", *opt);
             }
             return std::format_to(ctx.out(), "none");
         }

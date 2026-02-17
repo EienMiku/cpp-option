@@ -33,6 +33,39 @@ export namespace opt {
         template <typename T>
         concept pair_type = specialization_of<std::remove_cvref_t<T>, std::pair>;
 
+        template <class T>
+        constexpr bool tuple_like_no_subrange_impl = false;
+
+        template <class... T>
+        constexpr bool tuple_like_no_subrange_impl<std::tuple<T...>> = true;
+
+        template <class T1, class T2>
+        constexpr bool tuple_like_no_subrange_impl<std::pair<T1, T2>> = true;
+
+        template <class T, size_t Size>
+        constexpr bool tuple_like_no_subrange_impl<std::array<T, Size>> = true;
+
+        template <class T>
+        constexpr bool tuple_like_no_subrange_impl<std::complex<T>> = true;
+
+        template <class T>
+        concept tuple_like_no_subrange = tuple_like_no_subrange_impl<std::remove_cvref_t<T>>;
+
+        template <class T>
+        concept pair_like_no_subrange = tuple_like_no_subrange<T> && std::tuple_size_v<std::remove_cvref_t<T>> == 2;
+
+        template <class T>
+        constexpr bool is_ranges_subrange_v = false;
+
+        template <class Iter, class Sent, std::ranges::subrange_kind Kind>
+        constexpr bool is_ranges_subrange_v<std::ranges::subrange<Iter, Sent, Kind>> = true;
+
+        template <class T>
+        concept tuple_like = tuple_like_no_subrange<T> || is_ranges_subrange_v<std::remove_cvref_t<T>>;
+
+        template <class T>
+        concept pair_like = tuple_like<T> && std::tuple_size_v<std::remove_cvref_t<T>> == 2;
+
         template <typename T>
         concept option_type = specialization_of<std::remove_cvref_t<T>, option>;
 
@@ -42,9 +75,17 @@ export namespace opt {
                            || std::same_as<std::remove_cvref_t<T>, std::nullopt_t>;
 
         template <typename T>
-        concept has_clone = requires(const T &t) {
+        concept has_member_clone = requires(const T &t) {
             { t.clone() } -> std::convertible_to<T>;
         };
+
+        template <typename T>
+        concept has_adl_clone = requires(const T &t) {
+            { clone(t) } -> std::convertible_to<T>;
+        };
+
+        template <typename T>
+        concept has_clone = has_member_clone<T> || has_adl_clone<T>;
 
         template <typename T>
         concept cloneable = has_clone<T> || std::is_trivially_copyable_v<T>;
@@ -52,16 +93,21 @@ export namespace opt {
         template <typename T>
         concept noexcept_cloneable = requires(const T &v) {
             { v.clone() } noexcept;
+        } || requires(const T &v) {
+            { clone(v) } noexcept;
         } || (std::is_trivially_copyable_v<T> && std::is_nothrow_copy_constructible_v<T>);
 
         template <cloneable T>
         constexpr T clone_value(const T &value) noexcept(noexcept_cloneable<T>) {
-            if constexpr (has_clone<T>) {
+            if constexpr (has_member_clone<T>) {
                 return value.clone();
+            } else if constexpr (has_adl_clone<T>) {
+                return clone(value);
             } else {
                 static_assert(
                     std::is_trivially_copyable_v<T>,
-                    "Type must either have a .clone() member function or be trivially copyable, because it is "
+                    "Type must either have a .clone() member function, an ADL-findable clone() free function, "
+                    "or be trivially copyable, because it is "
                     "impossible to determine whether a user-defined copy constructor performs a deep copy.");
                 return value;
             }
@@ -93,8 +139,7 @@ export namespace opt {
 
 #if defined(__cpp_lib_reference_from_temporary) && __cpp_lib_reference_from_temporary >= 202202L
         template <class T, class U>
-        constexpr bool cpp23_reference_constructs_from_temporary_v =
-            std::reference_constructs_from_temporary_v<T, U>;
+        constexpr bool cpp23_reference_constructs_from_temporary_v = std::reference_constructs_from_temporary_v<T, U>;
 #elif defined(__clang__) && defined(__has_builtin) && __has_builtin(__reference_constructs_from_temporary)
         template <class T, class U>
         constexpr bool cpp23_reference_constructs_from_temporary_v = __reference_constructs_from_temporary(T, U);

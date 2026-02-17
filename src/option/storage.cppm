@@ -166,11 +166,12 @@ export namespace opt::detail {
             }
         }
 
-        constexpr auto &&get(this auto &&self) noexcept {
+        template <typename Self>
+        constexpr auto &&get(this Self &&self) noexcept {
             if constexpr (std::is_const_v<T>) {
-                return std::as_const(std::forward_like<decltype(self)>(self.value));
+                return std::as_const(std::forward_like<Self>(self.value));
             } else {
-                return std::forward_like<decltype(self)>(self.value);
+                return std::forward_like<Self>(self.value);
             }
         }
 
