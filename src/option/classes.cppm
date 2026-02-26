@@ -18,6 +18,14 @@ import :none;
     #define force_inline [[msvc::forceinline]]
 #endif
 
+#pragma push_macro("hot_path")
+#undef hot_path
+#if defined(__clang__) || defined(__GNUC__)
+    #define hot_path [[gnu::hot]]
+#else
+    #define hot_path
+#endif
+
 #pragma push_macro("cpp20_no_unique_address")
 #undef cpp20_no_unique_address
 #if defined(_MSC_VER)
@@ -52,7 +60,7 @@ export namespace opt {
         constexpr option(bool has_value) noexcept : storage{ has_value } {}
         constexpr explicit option(std::in_place_t) noexcept : storage{ true } {}
         constexpr option(const option &) = default;
-        constexpr option(option &&)      = default;
+        constexpr option(option &&) = default;
 
         constexpr option &operator=(std::nullopt_t) noexcept {
             storage.reset();
@@ -65,7 +73,7 @@ export namespace opt {
         }
 
         constexpr option &operator=(const option &) = default;
-        constexpr option &operator=(option &&)      = default;
+        constexpr option &operator=(option &&) = default;
 
         constexpr void emplace() noexcept {
             storage.emplace();
@@ -77,7 +85,7 @@ export namespace opt {
 
         // iterator
 
-        constexpr auto operator->(this auto &&) noexcept  = delete;
+        constexpr auto operator->(this auto &&) noexcept = delete;
         constexpr auto &&operator*(this auto &&) noexcept = delete;
 
         constexpr explicit operator bool() const noexcept {
@@ -242,7 +250,8 @@ export namespace opt {
             requires std::invocable<F>
         constexpr Ret map_or(U &&default_value, F &&f) const
             requires (!std::is_lvalue_reference_v<RF> || std::is_lvalue_reference_v<U>)
-                  && std::convertible_to<RF, Ret> && std::convertible_to<U, Ret>
+                  && std::convertible_to<RF, Ret>
+                  && std::convertible_to<U, Ret>
         {
             if (is_some()) {
                 return std::invoke(std::forward<F>(f));
@@ -257,7 +266,8 @@ export namespace opt {
                   && std::invocable<F>
                      constexpr Ret map_or_else(D &&default_f, F &&f) const
                          requires (!std::is_lvalue_reference_v<RF> || std::is_lvalue_reference_v<RD>)
-                               && std::convertible_to<RF, Ret> && std::convertible_to<RD, Ret>
+                               && std::convertible_to<RF, Ret>
+                               && std::convertible_to<RD, Ret>
         {
             if (is_some()) {
                 return std::invoke(std::forward<F>(f));
@@ -486,8 +496,8 @@ export namespace opt {
         }
 
         // https://eel.is/c++draft/optional.optional.general
-        using value_type     = T;
-        using iterator       = T *;
+        using value_type = T;
+        using iterator = T *;
         using const_iterator = const T *;
 
         // https://eel.is/c++draft/optional.ctor#lib:optional,constructor
@@ -1207,7 +1217,8 @@ export namespace opt {
             requires (std::is_lvalue_reference_v<Self> ? std::copy_constructible<T> : std::move_constructible<T>)
                   && std::invocable<F, decltype(*self)>
                   && (!std::is_lvalue_reference_v<RF> || std::is_lvalue_reference_v<U>)
-                  && std::convertible_to<RF, Ret> && std::convertible_to<U, Ret>
+                  && std::convertible_to<RF, Ret>
+                  && std::convertible_to<U, Ret>
         {
             if (self.is_some()) {
                 return std::invoke(std::forward<F>(f), *std::forward<Self>(self));
@@ -1244,7 +1255,8 @@ export namespace opt {
             requires (std::is_lvalue_reference_v<Self> ? std::copy_constructible<T> : std::move_constructible<T>)
                   && std::invocable<F, decltype(*std::forward<Self>(self))>
                   && (!std::is_lvalue_reference_v<RF> || std::is_lvalue_reference_v<RD>)
-                  && std::convertible_to<RF, Ret> && std::convertible_to<RD, Ret>
+                  && std::convertible_to<RF, Ret>
+                  && std::convertible_to<RD, Ret>
         {
             if (self.is_some()) {
                 return std::invoke(std::forward<F>(f), *std::forward<Self>(self));
@@ -1393,7 +1405,8 @@ export namespace opt {
                                                     std::common_reference_t<R, U>, std::remove_cvref_t<R>>>
         constexpr Ret unwrap_or(this Self &&self, U &&default_value)
             requires (std::is_lvalue_reference_v<Self> ? std::copy_constructible<T> : std::move_constructible<T>)
-                  && std::convertible_to<R, Ret> && std::convertible_to<U, Ret>
+                  && std::convertible_to<R, Ret>
+                  && std::convertible_to<U, Ret>
         {
             if (self.is_some()) [[likely]] {
                 return *std::forward<Self>(self);
@@ -1423,7 +1436,8 @@ export namespace opt {
         constexpr Ret unwrap_or_else(this Self &&self, F &&f)
             requires (std::is_lvalue_reference_v<Self> ? std::copy_constructible<T> : std::move_constructible<T>)
                   && (!std::is_lvalue_reference_v<RF> || std::is_lvalue_reference_v<R>)
-                  && std::convertible_to<R, Ret> && std::convertible_to<RF, Ret>
+                  && std::convertible_to<R, Ret>
+                  && std::convertible_to<RF, Ret>
         {
             if (self.is_some()) {
                 return *std::forward<Self>(self);
@@ -1553,7 +1567,7 @@ export namespace opt {
             requires detail::cloneable<T>
         {
             if (self.is_some()) {
-                return option{ detail::clone_value(*self) };
+                return option{ detail::clone(*self) };
             }
             return option{};
         }
@@ -1564,12 +1578,12 @@ export namespace opt {
             if (source.is_some()) {
                 if (self.is_some()) {
                     if constexpr (detail::has_clone<T>) {
-                        self.storage.get() = detail::clone_value(*source);
+                        self.storage.get() = detail::clone(*source);
                     } else {
                         self.storage.get() = *source;
                     }
                 } else {
-                    self.emplace(detail::clone_value(*source));
+                    self.emplace(detail::clone(*source));
                 }
             } else {
                 self.reset();
@@ -2281,8 +2295,7 @@ export namespace opt {
             requires detail::cloneable<std::remove_cvref_t<decltype(self.storage.get())>>
         {
             if (self.is_some()) {
-                return option<std::remove_cvref_t<decltype(self.storage.get())>>{ detail::clone_value(
-                    self.storage.get()) };
+                return option<std::remove_cvref_t<decltype(self.storage.get())>>{ detail::clone(self.storage.get()) };
             }
             return option<std::remove_cvref_t<decltype(self.storage.get())>>{};
         }
@@ -2384,7 +2397,8 @@ export namespace opt {
         constexpr Ret map_or(U &&default_value, F &&f) const
             requires std::invocable<F, T &>
                   && (!std::is_lvalue_reference_v<R> || std::is_lvalue_reference_v<U>)
-                  && std::convertible_to<R, Ret> && std::convertible_to<U, Ret>
+                  && std::convertible_to<R, Ret>
+                  && std::convertible_to<U, Ret>
         {
             if (is_some()) {
                 return std::invoke(std::forward<F>(f), storage.get());
@@ -2400,7 +2414,8 @@ export namespace opt {
         constexpr Ret map_or_else(D &&default_fn, F &&f) const
             requires std::invocable<F, T &>
                   && (!std::is_lvalue_reference_v<RF> || std::is_lvalue_reference_v<RD>)
-                  && std::convertible_to<RF, Ret> && std::convertible_to<RD, Ret>
+                  && std::convertible_to<RF, Ret>
+                  && std::convertible_to<RD, Ret>
         {
             if (is_some()) {
                 return std::invoke(std::forward<F>(f), storage.get());
@@ -2409,10 +2424,8 @@ export namespace opt {
         }
 
         template <typename F>
-        constexpr auto map_or_default(F &&f) const
-            -> std::invoke_result_t<F, T &>
-            requires std::invocable<F, T &>
-                  && std::default_initializable<std::invoke_result_t<F, T &>>
+        constexpr auto map_or_default(F &&f) const -> std::invoke_result_t<F, T &>
+            requires std::invocable<F, T &> && std::default_initializable<std::invoke_result_t<F, T &>>
         {
             using U = std::invoke_result_t<F, T &>;
             if (is_some()) {
@@ -2487,11 +2500,10 @@ export namespace opt {
         }
 
         template <typename U = std::remove_cv_t<T>,
-                  typename Ret = std::conditional_t<std::is_lvalue_reference_v<U>,
-                                                    std::common_reference_t<T &, U>, std::remove_cvref_t<T>>>
+                  typename Ret = std::conditional_t<std::is_lvalue_reference_v<U>, std::common_reference_t<T &, U>,
+                                                    std::remove_cvref_t<T>>>
         constexpr Ret unwrap_or(U &&default_value) const
-            requires std::convertible_to<T &, Ret>
-                  && std::convertible_to<U, Ret>
+            requires std::convertible_to<T &, Ret> && std::convertible_to<U, Ret>
         {
             if (is_some()) [[likely]] {
                 return storage.get();
@@ -2501,13 +2513,11 @@ export namespace opt {
 
         constexpr auto unwrap_or_default() const = delete;
 
-        template <std::invocable F,
-                  typename RF = std::invoke_result_t<F>,
-                  typename Ret = std::conditional_t<std::is_lvalue_reference_v<RF>,
-                                                    std::common_reference_t<T &, RF>, std::remove_cvref_t<T>>>
+        template <std::invocable F, typename RF = std::invoke_result_t<F>,
+                  typename Ret = std::conditional_t<std::is_lvalue_reference_v<RF>, std::common_reference_t<T &, RF>,
+                                                    std::remove_cvref_t<T>>>
         constexpr Ret unwrap_or_else(F &&f) const
-            requires std::convertible_to<T &, Ret>
-                  && std::convertible_to<RF, Ret>
+            requires std::convertible_to<T &, Ret> && std::convertible_to<RF, Ret>
         {
             if (is_some()) {
                 return storage.get();
@@ -2538,8 +2548,7 @@ export namespace opt {
         }
 
         template <typename U>
-            requires detail::option_like<U>
-                  && (!std::same_as<std::remove_cvref_t<U>, option>)
+            requires detail::option_like<U> && (!std::same_as<std::remove_cvref_t<U>, option>)
         force_inline constexpr auto xor_(this auto &&self, U &&optb) -> option {
             auto optb_option = option(std::forward<U>(optb));
             const bool self_some = self.is_some();
@@ -2572,8 +2581,7 @@ export namespace opt {
         {
             using result_type = std::remove_cv_t<std::invoke_result_t<F, T &, decltype(*std::forward<U>(other))>>;
             if (is_some() && other.is_some()) {
-                return option<result_type>{ std::invoke(std::forward<F>(f), storage.get(),
-                                                        *std::forward<U>(other)) };
+                return option<result_type>{ std::invoke(std::forward<F>(f), storage.get(), *std::forward<U>(other)) };
             }
             return option<result_type>{};
         }
@@ -2590,8 +2598,8 @@ export namespace opt {
             return *this <=> other;
         }
 
-        constexpr auto(max)(this auto &&self,
-                            const option &other) noexcept(noexcept(static_cast<bool>(self > other))) -> option
+        constexpr auto(max)(this auto &&self, const option &other) noexcept(noexcept(static_cast<bool>(self > other)))
+            -> option
             requires std::three_way_comparable<T>
         {
             if (self.is_some() && other.is_some()) {
@@ -2610,8 +2618,8 @@ export namespace opt {
             return self.is_some() ? self : std::move(other);
         }
 
-        constexpr auto(min)(this auto &&self,
-                            const option &other) noexcept(noexcept(static_cast<bool>(self < other))) -> option
+        constexpr auto(min)(this auto &&self, const option &other) noexcept(noexcept(static_cast<bool>(self < other)))
+            -> option
             requires std::three_way_comparable<T>
         {
             if (self.is_some() && other.is_some()) {
@@ -2664,15 +2672,15 @@ export namespace opt {
             return option{};
         }
 
-        constexpr auto eq(this auto &&self,
-                          const option &other) noexcept(noexcept(static_cast<bool>(self == other))) -> bool
+        constexpr auto eq(this auto &&self, const option &other) noexcept(noexcept(static_cast<bool>(self == other)))
+            -> bool
             requires std::equality_comparable<T>
         {
             return self == other;
         }
 
-        constexpr auto ne(this auto &&self,
-                          const option &other) noexcept(noexcept(static_cast<bool>(self != other))) -> bool
+        constexpr auto ne(this auto &&self, const option &other) noexcept(noexcept(static_cast<bool>(self != other)))
+            -> bool
             requires std::equality_comparable<T>
         {
             return self != other;
@@ -2685,29 +2693,29 @@ export namespace opt {
             return self.cmp(other);
         }
 
-        constexpr auto lt(this auto &&self,
-                          const option &other) noexcept(noexcept(static_cast<bool>(self < other))) -> bool
+        constexpr auto lt(this auto &&self, const option &other) noexcept(noexcept(static_cast<bool>(self < other)))
+            -> bool
             requires std::three_way_comparable<T>
         {
             return self < other;
         }
 
-        constexpr auto le(this auto &&self,
-                          const option &other) noexcept(noexcept(static_cast<bool>(self <= other))) -> bool
+        constexpr auto le(this auto &&self, const option &other) noexcept(noexcept(static_cast<bool>(self <= other)))
+            -> bool
             requires std::three_way_comparable<T>
         {
             return self <= other;
         }
 
-        constexpr auto gt(this auto &&self,
-                          const option &other) noexcept(noexcept(static_cast<bool>(self > other))) -> bool
+        constexpr auto gt(this auto &&self, const option &other) noexcept(noexcept(static_cast<bool>(self > other)))
+            -> bool
             requires std::three_way_comparable<T>
         {
             return self > other;
         }
 
-        constexpr auto ge(this auto &&self,
-                          const option &other) noexcept(noexcept(static_cast<bool>(self >= other))) -> bool
+        constexpr auto ge(this auto &&self, const option &other) noexcept(noexcept(static_cast<bool>(self >= other)))
+            -> bool
             requires std::three_way_comparable<T>
         {
             return self >= other;
@@ -2737,6 +2745,7 @@ export namespace opt {
     };
 } // namespace opt
 
-#pragma pop_macro("cpp20_no_unique_address")
 #pragma pop_macro("force_inline")
+#pragma pop_macro("hot_path")
+#pragma pop_macro("cpp20_no_unique_address")
 #pragma pop_macro("has_cpp_lib_optional_ref")

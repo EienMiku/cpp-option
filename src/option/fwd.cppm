@@ -74,44 +74,50 @@ export namespace opt {
                            || std::same_as<std::remove_cvref_t<T>, none_t>
                            || std::same_as<std::remove_cvref_t<T>, std::nullopt_t>;
 
-        template <typename T>
-        concept has_member_clone = requires(const T &t) {
-            { t.clone() } -> std::convertible_to<T>;
-        };
+        namespace _clone_cpo {
+            void clone() = delete;
+
+            struct _fn {
+                template <typename T>
+                    requires requires(const T &t) { { t.clone() } -> std::convertible_to<T>; }
+                constexpr T operator()(const T &t) const
+                    noexcept(requires(const T &v) { { v.clone() } noexcept; }) {
+                    return t.clone();
+                }
+
+                template <typename T>
+                    requires (!requires(const T &t) { { t.clone() } -> std::convertible_to<T>; })
+                          && requires(const T &t) { { clone(t) } -> std::convertible_to<T>; }
+                constexpr T operator()(const T &t) const
+                    noexcept(requires(const T &v) { { clone(v) } noexcept; }) {
+                    return clone(t);
+                }
+
+                template <typename T>
+                    requires (!requires(const T &t) { { t.clone() } -> std::convertible_to<T>; })
+                          && (!requires(const T &t) { { clone(t) } -> std::convertible_to<T>; })
+                          && std::is_trivially_copyable_v<T>
+                constexpr T operator()(const T &t) const
+                    noexcept(std::is_nothrow_copy_constructible_v<T>) {
+                    return t;
+                }
+            };
+        } // namespace _clone_cpo
+
+        inline constexpr _clone_cpo::_fn clone{};
 
         template <typename T>
-        concept has_adl_clone = requires(const T &t) {
+        concept has_clone = requires(const T &t) {
             { clone(t) } -> std::convertible_to<T>;
         };
 
         template <typename T>
-        concept has_clone = has_member_clone<T> || has_adl_clone<T>;
+        concept cloneable = has_clone<T>;
 
         template <typename T>
-        concept cloneable = has_clone<T> || std::is_trivially_copyable_v<T>;
-
-        template <typename T>
-        concept noexcept_cloneable = requires(const T &v) {
-            { v.clone() } noexcept;
-        } || requires(const T &v) {
-            { clone(v) } noexcept;
-        } || (std::is_trivially_copyable_v<T> && std::is_nothrow_copy_constructible_v<T>);
-
-        template <cloneable T>
-        constexpr T clone_value(const T &value) noexcept(noexcept_cloneable<T>) {
-            if constexpr (has_member_clone<T>) {
-                return value.clone();
-            } else if constexpr (has_adl_clone<T>) {
-                return clone(value);
-            } else {
-                static_assert(
-                    std::is_trivially_copyable_v<T>,
-                    "Type must either have a .clone() member function, an ADL-findable clone() free function, "
-                    "or be trivially copyable, because it is "
-                    "impossible to determine whether a user-defined copy constructor performs a deep copy.");
-                return value;
-            }
-        }
+        concept noexcept_cloneable = cloneable<T> && requires(const T &t) {
+            { clone(t) } noexcept;
+        };
 
         struct within_invoke_t {
             constexpr explicit within_invoke_t() = default;
