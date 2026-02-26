@@ -150,6 +150,9 @@ namespace opt {
                                        || std::constructible_from<T, const W>
                                        || std::convertible_to<const W, T>;
 
+        template <typename T>
+        concept not_void = !std::is_void_v<T>;
+
         inline namespace swap {
             using std::swap;
 
@@ -1643,7 +1646,9 @@ namespace opt {
         // Leaves the original `option` in-place, returning a new one holding a const
         // reference to the dereferenced value of the original.
         constexpr auto as_deref() const
-            requires requires(T v) { *v; }
+            requires requires(const T &v) {
+                { *v } -> detail::not_void;
+            }
         {
             return as_ref().map([](const auto &self) -> const auto & { return *self; });
         }
@@ -1654,7 +1659,9 @@ namespace opt {
         // Leaves the original `option` in-place, returning a new one holding a reference
         // to the dereferenced value of the original.
         constexpr auto as_deref_mut()
-            requires requires(T v) { *v; }
+            requires requires(T &v) {
+                { *v } -> detail::not_void;
+            }
         {
             return as_mut().map([](auto &&self) -> decltype(auto) { return *self; });
         }
@@ -1855,6 +1862,7 @@ namespace opt {
             -> std::invoke_result_t<F, decltype(*std::forward<Self>(self))>
             requires (std::is_lvalue_reference_v<Self> ? std::copy_constructible<T> : std::move_constructible<T>)
                   && std::invocable<F, decltype(*std::forward<Self>(self))>
+                  && std::default_initializable<std::invoke_result_t<F, decltype(*std::forward<Self>(self))>>
         {
             using U = std::invoke_result_t<F, decltype(*std::forward<Self>(self))>;
             if (self.is_some()) {
@@ -2822,13 +2830,18 @@ namespace opt {
 
         // https://eel.is/c++draft/optional.ref.monadic#itemdecl:2
         template <class F>
-        constexpr option<std::remove_cv_t<std::invoke_result_t<F, T &>>> transform(F &&f) const {
+        constexpr auto transform(F &&f) const {
             using U = std::remove_cv_t<std::invoke_result_t<F, T &>>;
 
             if (is_some()) {
-                return option<U>{ detail::within_invoke, std::forward<F>(f), storage.get() };
+                if constexpr (std::same_as<U, void>) {
+                    std::invoke(std::forward<F>(f), storage.get());
+                    return option<void>{ true };
+                } else {
+                    return option<U>{ detail::within_invoke, std::forward<F>(f), storage.get() };
+                }
             }
-            return option<U>();
+            return option<U>{};
         }
 
         // https://eel.is/c++draft/optional.ref.monadic#itemdecl:3
@@ -2856,34 +2869,34 @@ namespace opt {
             storage.reset();
         }
 
+        force_inline constexpr auto and_(this auto &&self, const option &optb) -> option {
+            return self.is_some() ? optb : option{};
+        }
+
+        force_inline constexpr auto and_(this auto &&self, option &&optb) -> option {
+            return self.is_some() ? std::move(optb) : option{};
+        }
+
         template <detail::option_like U>
-        constexpr auto and_(U &&optb) const -> option {
-            if (is_some()) {
-                return option(std::forward<U>(optb));
-            }
-            return option{};
+            requires (!std::same_as<std::remove_cvref_t<U>, option>)
+        force_inline constexpr auto and_(this auto &&self, U &&optb) -> option {
+            return self.is_some() ? option(std::forward<U>(optb)) : option{};
         }
 
         constexpr auto as_deref() const
-            requires std::is_pointer_v<std::remove_reference_t<T>>
-        {
-            if (is_some()) {
-                using pointee_type = std::remove_pointer_t<std::remove_reference_t<T>>;
-                return option<const pointee_type &>{ *storage.get() };
+            requires requires(const T &v) {
+                { *v } -> detail::not_void;
             }
-            using pointee_type = std::remove_pointer_t<std::remove_reference_t<T>>;
-            return option<const pointee_type &>{};
+        {
+            return as_ref().map([](const auto &self) -> const auto & { return *self; });
         }
 
         constexpr auto as_deref_mut()
-            requires std::is_pointer_v<std::remove_reference_t<T>>
-        {
-            if (is_some()) {
-                using pointee_type = std::remove_pointer_t<std::remove_reference_t<T>>;
-                return option<pointee_type &>{ *storage.get() };
+            requires requires(T &v) {
+                { *v } -> detail::not_void;
             }
-            using pointee_type = std::remove_pointer_t<std::remove_reference_t<T>>;
-            return option<pointee_type &>{};
+        {
+            return as_mut().map([](auto &&self) -> decltype(auto) { return *self; });
         }
 
         // Converts from `option<T> &` to `option<T&>`.
@@ -2964,7 +2977,7 @@ namespace opt {
 
         template <typename Self, typename F>
         constexpr auto inspect(this Self &&self, F &&f) -> Self && {
-            if (self.is_some()) {
+            if (self.is_some()) [[likely]] {
                 std::invoke(std::forward<F>(f), self.storage.get());
             }
             return std::forward<Self>(self);
@@ -3005,11 +3018,7 @@ namespace opt {
                 }
             }
 
-            if constexpr (std::same_as<U, void>) {
-                return option<void>{};
-            } else {
-                return option<U>{};
-            }
+            return option<U>{};
         }
 
         template <typename F, typename U, typename R = std::invoke_result_t<F, T &>,
@@ -3044,21 +3053,39 @@ namespace opt {
             return std::invoke(std::forward<D>(default_fn));
         }
 
-        template <typename E>
-        constexpr auto ok_or(E &&err) const -> std::expected<T &, std::remove_cvref_t<E>> {
+        template <typename F>
+        constexpr auto map_or_default(F &&f) const
+            -> std::invoke_result_t<F, T &>
+            requires std::invocable<F, T &>
+                  && std::default_initializable<std::invoke_result_t<F, T &>>
+        {
+            using U = std::invoke_result_t<F, T &>;
             if (is_some()) {
-                return std::expected<T &, std::remove_cvref_t<E>>{ storage.get() };
+                return std::invoke(std::forward<F>(f), storage.get());
             }
-            return std::expected<T &, std::remove_cvref_t<E>>{ std::unexpect, std::forward<E>(err) };
+            return U{};
+        }
+
+        template <typename E>
+        constexpr auto ok_or(E &&err) const -> std::expected<T &, std::remove_cvref_t<E>>
+            requires std::constructible_from<std::remove_cvref_t<E>, E>
+        {
+            using result_type = std::expected<T &, std::remove_cvref_t<E>>;
+            if (is_some()) {
+                return result_type{ storage.get() };
+            }
+            return result_type{ std::unexpect, std::forward<E>(err) };
         }
 
         template <std::invocable F>
-        constexpr auto ok_or_else(F &&f) const -> std::expected<T &, std::remove_cvref_t<std::invoke_result_t<F>>> {
-            using E = std::remove_cvref_t<std::invoke_result_t<F>>;
+        constexpr auto ok_or_else(F &&f) const -> std::expected<T &, std::remove_cvref_t<std::invoke_result_t<F>>>
+            requires std::constructible_from<std::remove_cvref_t<std::invoke_result_t<F>>, std::invoke_result_t<F>>
+        {
+            using result_type = std::expected<T &, std::remove_cvref_t<std::invoke_result_t<F>>>;
             if (is_some()) {
-                return std::expected<T &, E>{ storage.get() };
+                return result_type{ storage.get() };
             }
-            return std::expected<T &, E>{ std::unexpect, std::invoke(std::forward<F>(f)) };
+            return result_type{ std::unexpect, std::invoke(std::forward<F>(f)) };
         }
 
         template <detail::option_like U>
@@ -3104,30 +3131,31 @@ namespace opt {
             return storage.get();
         }
 
-        template <class U>
-        constexpr auto unwrap_or(U &u) const -> T &
-            requires (!std::is_array_v<T>) && std::is_object_v<T> && std::convertible_to<U &, T &>
+        template <typename U = std::remove_cv_t<T>,
+                  typename Ret = std::conditional_t<std::is_lvalue_reference_v<U>,
+                                                    std::common_reference_t<T &, U>, std::remove_cvref_t<T>>>
+        constexpr Ret unwrap_or(U &&default_value) const
+            requires std::convertible_to<T &, Ret>
+                  && std::convertible_to<U, Ret>
         {
-            return is_some() ? storage.get() : u;
-        }
-
-        template <class U>
-        constexpr auto unwrap_or(U &&u) const -> std::decay_t<T>
-            requires (!std::is_array_v<T>) && std::is_object_v<T> && std::convertible_to<U, std::decay_t<T>>
-        {
-            static_assert(std::is_constructible_v<std::remove_cv_t<T>, T &>);
-            return is_some() ? storage.get() : static_cast<std::decay_t<T>>(std::forward<U>(u));
+            if (is_some()) [[likely]] {
+                return storage.get();
+            }
+            return std::forward<U>(default_value);
         }
 
         constexpr auto unwrap_or_default() const = delete;
 
-        template <std::invocable F>
-        constexpr auto unwrap_or_else(F &&f) const -> std::invoke_result_t<F>
-            requires (!std::is_array_v<T>) && std::is_object_v<T> && std::convertible_to<T &, std::invoke_result_t<F>>
+        template <std::invocable F,
+                  typename RF = std::invoke_result_t<F>,
+                  typename Ret = std::conditional_t<std::is_lvalue_reference_v<RF>,
+                                                    std::common_reference_t<T &, RF>, std::remove_cvref_t<T>>>
+        constexpr Ret unwrap_or_else(F &&f) const
+            requires std::convertible_to<T &, Ret>
+                  && std::convertible_to<RF, Ret>
         {
-            using R = std::invoke_result_t<F>;
             if (is_some()) {
-                return static_cast<R>(storage.get());
+                return storage.get();
             }
             return std::invoke(std::forward<F>(f));
         }
@@ -3136,34 +3164,198 @@ namespace opt {
             return storage.get();
         }
 
-        template <detail::option_like U>
-        constexpr auto xor_(this auto &&self, U &&optb) -> option {
-            auto optb_reformed = option(std::forward<U>(optb));
-            if (self.is_some() && optb_reformed.is_none()) {
-                return self;
+        force_inline constexpr auto xor_(this auto &&self, const option &optb) -> option {
+            const bool self_some = self.is_some();
+            const bool optb_some = optb.is_some();
+            if (self_some != optb_some) {
+                return self_some ? self : optb;
             }
-            if (self.is_none() && optb_reformed.is_some()) {
-                return optb_reformed;
+            return option{};
+        }
+
+        force_inline constexpr auto xor_(this auto &&self, option &&optb) -> option {
+            const bool self_some = self.is_some();
+            const bool optb_some = optb.is_some();
+            if (self_some != optb_some) {
+                return self_some ? self : std::move(optb);
+            }
+            return option{};
+        }
+
+        template <typename U>
+            requires detail::option_like<U>
+                  && (!std::same_as<std::remove_cvref_t<U>, option>)
+        force_inline constexpr auto xor_(this auto &&self, U &&optb) -> option {
+            auto optb_option = option(std::forward<U>(optb));
+            const bool self_some = self.is_some();
+            const bool optb_some = optb_option.is_some();
+            if (self_some != optb_some) {
+                return self_some ? self : optb_option;
             }
             return option{};
         }
 
         template <detail::option_type U>
-        constexpr auto zip(U &&other) const -> option<std::pair<T &, decltype(*other)>> {
+        constexpr auto zip(U &&other) const
+            requires (std::is_lvalue_reference_v<U>
+                          ? std::copy_constructible<typename std::remove_cvref_t<U>::value_type>
+                          : std::move_constructible<typename std::remove_cvref_t<U>::value_type>)
+        {
+            using pair_type = std::pair<T &, typename std::remove_cvref_t<U>::value_type>;
             if (is_some() && other.is_some()) {
-                return option<std::pair<T &, decltype(*other)>>{ std::in_place, storage.get(), *other };
+                return option<pair_type>{ std::in_place, storage.get(), *std::forward<U>(other) };
             }
-            return option<std::pair<T &, decltype(*other)>>{};
+            return option<pair_type>{};
         }
 
         template <detail::option_type U, typename F>
-        constexpr auto zip_with(U &&other, F &&f) const
-            -> option<std::remove_cv_t<std::invoke_result_t<F, T &, decltype(*other)>>> {
-            using RF = std::remove_cv_t<std::invoke_result_t<F, T &, decltype(*other)>>;
+        constexpr auto zip_with(U &&other, F &&f)  const
+            requires (std::is_lvalue_reference_v<U>
+                          ? std::copy_constructible<typename std::remove_cvref_t<U>::value_type>
+                          : std::move_constructible<typename std::remove_cvref_t<U>::value_type>)
+                  && std::invocable<F, T &, decltype(*std::forward<U>(other))>
+        {
+            using result_type = std::remove_cv_t<std::invoke_result_t<F, T &, decltype(*std::forward<U>(other))>>;
             if (is_some() && other.is_some()) {
-                return option<RF>{ std::in_place, std::invoke(std::forward<F>(f), storage.get(), *other) };
+                return option<result_type>{ std::invoke(std::forward<F>(f), storage.get(),
+                                                        *std::forward<U>(other)) };
             }
-            return option<RF>{};
+            return option<result_type>{};
+        }
+
+        static constexpr auto default_() noexcept -> option {
+            return option{};
+        }
+
+        constexpr auto cmp(const option &other) const noexcept(requires(const option &lhs, const option &rhs) {
+            { lhs <=> rhs } noexcept;
+        })
+            requires std::three_way_comparable<T>
+        {
+            return *this <=> other;
+        }
+
+        constexpr auto(max)(this auto &&self,
+                            const option &other) noexcept(noexcept(static_cast<bool>(self > other))) -> option
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some() && other.is_some()) {
+                return self > other ? self : other;
+            }
+            return self.is_some() ? self : other;
+        }
+
+        constexpr auto(max)(this auto &&self, option &&other) noexcept(noexcept(static_cast<bool>(self > other)))
+            -> option
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some() && other.is_some()) {
+                return self > other ? self : std::move(other);
+            }
+            return self.is_some() ? self : std::move(other);
+        }
+
+        constexpr auto(min)(this auto &&self,
+                            const option &other) noexcept(noexcept(static_cast<bool>(self < other))) -> option
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some() && other.is_some()) {
+                return self < other ? self : other;
+            }
+            return self.is_none() ? self : other;
+        }
+
+        constexpr auto(min)(this auto &&self, option &&other) noexcept(noexcept(static_cast<bool>(self < other)))
+            -> option
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some() && other.is_some()) {
+                return self < other ? self : std::move(other);
+            }
+            return self.is_none() ? self : std::move(other);
+        }
+
+        constexpr auto clamp(this auto &&self, const option &min,
+                             const option &max) noexcept(noexcept(static_cast<bool>(self < min))
+                                                         && noexcept(static_cast<bool>(self > max))) -> option
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some()) {
+                if (min.is_some() && self < min) {
+                    return min;
+                }
+                if (max.is_some() && self > max) {
+                    return max;
+                }
+                return self;
+            }
+            return option{};
+        }
+
+        constexpr auto clamp(this auto &&self, option &&min,
+                             option &&max) noexcept(noexcept(static_cast<bool>(self < min))
+                                                    && noexcept(static_cast<bool>(self > max))) -> option
+            requires std::three_way_comparable<T>
+        {
+            if (self.is_some()) {
+                if (min.is_some() && self < min) {
+                    return min;
+                }
+                if (max.is_some() && self > max) {
+                    return max;
+                }
+                return self;
+            }
+            return option{};
+        }
+
+        constexpr auto eq(this auto &&self,
+                          const option &other) noexcept(noexcept(static_cast<bool>(self == other))) -> bool
+            requires std::equality_comparable<T>
+        {
+            return self == other;
+        }
+
+        constexpr auto ne(this auto &&self,
+                          const option &other) noexcept(noexcept(static_cast<bool>(self != other))) -> bool
+            requires std::equality_comparable<T>
+        {
+            return self != other;
+        }
+
+        constexpr auto partial_cmp(this auto &&self, const option &other) noexcept(noexcept(self.cmp(other)))
+            -> decltype(self.cmp(other))
+            requires std::three_way_comparable<T>
+        {
+            return self.cmp(other);
+        }
+
+        constexpr auto lt(this auto &&self,
+                          const option &other) noexcept(noexcept(static_cast<bool>(self < other))) -> bool
+            requires std::three_way_comparable<T>
+        {
+            return self < other;
+        }
+
+        constexpr auto le(this auto &&self,
+                          const option &other) noexcept(noexcept(static_cast<bool>(self <= other))) -> bool
+            requires std::three_way_comparable<T>
+        {
+            return self <= other;
+        }
+
+        constexpr auto gt(this auto &&self,
+                          const option &other) noexcept(noexcept(static_cast<bool>(self > other))) -> bool
+            requires std::three_way_comparable<T>
+        {
+            return self > other;
+        }
+
+        constexpr auto ge(this auto &&self,
+                          const option &other) noexcept(noexcept(static_cast<bool>(self >= other))) -> bool
+            requires std::three_way_comparable<T>
+        {
+            return self >= other;
         }
 
         // Converts from `option<T> &` to `option<T&>`.
