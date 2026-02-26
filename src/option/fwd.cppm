@@ -130,6 +130,9 @@ export namespace opt {
                                        || std::constructible_from<T, const W>
                                        || std::convertible_to<const W, T>;
 
+        template <typename T>
+        concept not_void = !std::is_void_v<T>;
+
         inline namespace swap {
             using std::swap;
 
