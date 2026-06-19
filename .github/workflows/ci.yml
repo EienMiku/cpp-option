@@ -45,12 +45,11 @@ jobs:
 
       - name: Build and run unit test & benchmark (GCC)
         run: |
-          xmake config --mode=release
-          xmake f --toolchain=gcc --file=xmake.ci.gcc.lua --yes
+          xmake f --toolchain=gcc --mode=release --file=xmake.ci.gcc.lua --yes
           xmake --yes --file=xmake.ci.gcc.lua
-          xmake run test_unit_gcc
-          xmake run bench_gcc
-          xmake run bench_debug_opt_gcc
+          xmake run test_unit_gcc --file=xmake.ci.gcc.lua
+          xmake run bench_gcc --file=xmake.ci.gcc.lua
+          xmake run bench_debug_opt_gcc --file=xmake.ci.gcc.lua
 
       - name: List build outputs
         run: |
@@ -101,12 +100,11 @@ jobs:
 
       - name: Build and run unit test & benchmark (Clang/libc++)
         run: |
-          xmake config --mode=release
-          xmake f --toolchain=clang --file=xmake.ci.clang.lua --yes
+          xmake f --toolchain=clang --mode=release --file=xmake.ci.clang.lua --yes
           xmake --yes --file=xmake.ci.clang.lua
-          xmake run test_unit_clang
-          xmake run bench_clang
-          xmake run bench_debug_opt_clang
+          xmake run test_unit_clang --file=xmake.ci.clang.lua
+          xmake run bench_clang --file=xmake.ci.clang.lua
+          xmake run bench_debug_opt_clang --file=xmake.ci.clang.lua
 
       - name: List build outputs
         run: |
@@ -143,11 +141,10 @@ jobs:
 
       - name: Build and run unit test & benchmark (MSVC)
         run: |
-          xmake config --mode=release
-          xmake f --toolchain=msvc[vs=2026] --file=xmake.ci.windows.lua --yes
+          xmake f --toolchain=msvc[vs=2026] --mode=release --file=xmake.ci.windows.lua --yes
           xmake --yes --file=xmake.ci.windows.lua
-          xmake run test_unit_msvc
-          xmake run bench_msvc
+          xmake run test_unit_msvc --file=xmake.ci.windows.lua
+          xmake run bench_msvc --file=xmake.ci.windows.lua
 
       - name: Upload MSVC artifacts
         uses: actions/upload-artifact@v4
