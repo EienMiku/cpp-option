@@ -657,8 +657,7 @@ static_assert(process(5) == opt::some(10));
 可通过如下命令编译并运行（以 GCC 为例）：
 
 ```sh
-xmake f --toolchain=gcc --file=xmake.ci.lua
-xmake run test_unit_gcc
+xmake run test_unit_gcc --file=xmake.ci.gcc.lua
 ```
 
 如需自定义或扩展测试，请参考 `tests/test_unit.cpp`，并确保已安装 gtest。
@@ -676,8 +675,7 @@ xmake run test_unit_gcc
 可通过如下命令编译并运行（以 Clang 为例）：
 
 ```sh
-xmake f --toolchain=clang --file=xmake.ci.lua
-xmake run bench_clang
+xmake run bench_clang --file=xmake.ci.clang.lua
 ```
 
 如需添加新的基准测试，请参考 `benchmarks/bench.cpp`，并确保已安装 benchmark。
@@ -693,10 +691,9 @@ xmake run bench_clang
 如需本地模拟 CI 流程，可直接运行：
 
 ```sh
-xmake f --toolchain=gcc --file=xmake.ci.lua --yes
-xmake --yes
-xmake run test_unit_gcc
-xmake run bench_gcc
+xmake --yes --file=xmake.ci.gcc.lua
+xmake run test_unit_gcc --file=xmake.ci.gcc.lua
+xmake run bench_gcc --file=xmake.ci.gcc.lua
 ```
 
 ## 编译要求
