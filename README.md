@@ -642,7 +642,8 @@ Supported on three major compilers (GCC, Clang, MSVC), with corresponding target
 Example command (GCC):
 
 ```sh
-xmake run test_unit_gcc --file=xmake.ci.gcc.lua
+xmake f --toolchain=gcc --file=xmake.ci.lua
+xmake run test_unit_gcc
 ```
 
 To customize or extend tests, refer to `tests/test_unit.cpp` and ensure gtest is installed.
@@ -660,7 +661,8 @@ Also supported on three major compilers, with corresponding targets:
 Example command (Clang):
 
 ```sh
-xmake run bench_clang --file=xmake.ci.clang.lua
+xmake f --toolchain=clang --file=xmake.ci.lua
+xmake run bench_clang
 ```
 
 To add new benchmarks, refer to `benchmarks/bench.cpp` and ensure benchmark is installed.
@@ -676,9 +678,10 @@ This project uses GitHub Actions for automated build, test, and benchmark. See `
 To simulate CI locally:
 
 ```sh
-xmake --yes --file=xmake.ci.gcc.lua
-xmake run test_unit_gcc --file=xmake.ci.gcc.lua
-xmake run bench_gcc --file=xmake.ci.gcc.lua
+xmake f --toolchain=gcc --file=xmake.ci.lua --yes
+xmake --yes
+xmake run test_unit_gcc
+xmake run bench_gcc
 ```
 
 ## Build Requirements
