@@ -1,6 +1,6 @@
 // NOLINTBEGIN
 
-#include "include/option.hpp"
+#include "option.hpp"
 #include <format>
 #include <gtest/gtest.h>
 #include <string>

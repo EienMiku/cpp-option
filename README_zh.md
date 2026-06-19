@@ -639,14 +639,14 @@ static_assert(process(5) == opt::some(10));
 
 本库为头文件库 / 模块库，支持多种集成方式：
 
-- **头文件方式**：直接复制 `src/include/option.hpp` 到你的项目，并在代码中 `#include "option.hpp"`。
+- **头文件方式**：直接复制 `include/option.hpp` 到你的项目，并在代码中 `#include "option.hpp"`。
 - **模块方式**：复制 `src/option.cppm` 到你的项目，并在代码中 `import option;`。注意需编译器支持模块和标准库模块。
 
 ## 测试与基准
 
 ### 单元测试（gtest）
 
-本项目内置了基于 [GoogleTest](https://github.com/google/googletest) 的单元测试，测试文件为 `src/test_unit.cpp`。
+本项目内置了基于 [GoogleTest](https://github.com/google/googletest) 的单元测试，测试文件为 `tests/test_unit.cpp`。
 
 支持三大主流编译器（GCC、Clang、MSVC），分别对应 target：
 
@@ -657,14 +657,15 @@ static_assert(process(5) == opt::some(10));
 可通过如下命令编译并运行（以 GCC 为例）：
 
 ```sh
-xmake run test_unit_gcc --file=xmake.ci.lua
+xmake f --toolchain=gcc --file=xmake.ci.lua
+xmake run test_unit_gcc
 ```
 
-如需自定义或扩展测试，请参考 `src/test_unit.cpp`，并确保已安装 gtest。
+如需自定义或扩展测试，请参考 `tests/test_unit.cpp`，并确保已安装 gtest。
 
 ### 性能基准（benchmark）
 
-性能测试基于 [Google Benchmark](https://github.com/google/benchmark)，主文件为 `src/bench.cpp`。
+性能测试基于 [Google Benchmark](https://github.com/google/benchmark)，主文件为 `benchmarks/bench.cpp`。
 
 同样支持三大主流编译器，分别对应 target：
 
@@ -675,10 +676,11 @@ xmake run test_unit_gcc --file=xmake.ci.lua
 可通过如下命令编译并运行（以 Clang 为例）：
 
 ```sh
-xmake run bench_clang --file=xmake.ci.lua
+xmake f --toolchain=clang --file=xmake.ci.lua
+xmake run bench_clang
 ```
 
-如需添加新的基准测试，请参考 `src/bench.cpp`，并确保已安装 benchmark。
+如需添加新的基准测试，请参考 `benchmarks/bench.cpp`，并确保已安装 benchmark。
 
 ## CI 持续集成
 
@@ -691,9 +693,10 @@ xmake run bench_clang --file=xmake.ci.lua
 如需本地模拟 CI 流程，可直接运行：
 
 ```sh
-xmake --yes --file=xmake.ci.lua
-xmake run test_unit --file=xmake.ci.lua
-xmake run bench --file=xmake.ci.lua
+xmake f --toolchain=gcc --file=xmake.ci.lua --yes
+xmake --yes
+xmake run test_unit_gcc
+xmake run bench_gcc
 ```
 
 ## 编译要求

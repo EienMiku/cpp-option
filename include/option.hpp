@@ -3829,7 +3829,7 @@ namespace opt {
     // constraint:
     //   The call to make_optional does not use an explicit template-argument-list
     //   that begins with a type template-argument.
-    // impl with type of private type constant, from libsrdcxx (int = 0)
+    // impl with type of private type constant, from libstdcxx (int = 0)
     // template <decltype([] {}) = {}, class T>  | Clang bug, related to #118241
     template <auto = detail::prevent_explicit_barrier, class T>
     constexpr option<std::decay_t<T>> make_option(T &&v) noexcept(

@@ -624,14 +624,14 @@ static_assert(process(5) == opt::some(10));
 
 This library is header-only / module-based, supporting multiple integration methods:
 
-- **Header**: Copy `src/include/option.hpp` to your project and `#include "option.hpp"`.
+- **Header**: Copy `include/option.hpp` to your project and `#include "option.hpp"`.
 - **Module**: Copy `src/option.cppm` to your project and use `import option;`. Requires compiler support for modules and standard library modules.
 
 ## Testing & Benchmark
 
 ### Unit Test (gtest)
 
-Unit tests are based on [GoogleTest](https://github.com/google/googletest), with main file at `src/test_unit.cpp`.
+Unit tests are based on [GoogleTest](https://github.com/google/googletest), with main file at `tests/test_unit.cpp`.
 
 Supported on three major compilers (GCC, Clang, MSVC), with corresponding targets:
 
@@ -642,14 +642,15 @@ Supported on three major compilers (GCC, Clang, MSVC), with corresponding target
 Example command (GCC):
 
 ```sh
-xmake run test_unit_gcc --file=xmake.ci.lua
+xmake f --toolchain=gcc --file=xmake.ci.lua
+xmake run test_unit_gcc
 ```
 
-To customize or extend tests, refer to `src/test_unit.cpp` and ensure gtest is installed.
+To customize or extend tests, refer to `tests/test_unit.cpp` and ensure gtest is installed.
 
 ### Benchmark (Google Benchmark)
 
-Benchmarks are based on [Google Benchmark](https://github.com/google/benchmark), with main file at `src/bench.cpp`.
+Benchmarks are based on [Google Benchmark](https://github.com/google/benchmark), with main file at `benchmarks/bench.cpp`.
 
 Also supported on three major compilers, with corresponding targets:
 
@@ -660,10 +661,11 @@ Also supported on three major compilers, with corresponding targets:
 Example command (Clang):
 
 ```sh
-xmake run bench_clang --file=xmake.ci.lua
+xmake f --toolchain=clang --file=xmake.ci.lua
+xmake run bench_clang
 ```
 
-To add new benchmarks, refer to `src/bench.cpp` and ensure benchmark is installed.
+To add new benchmarks, refer to `benchmarks/bench.cpp` and ensure benchmark is installed.
 
 ## CI (Continuous Integration)
 
@@ -676,9 +678,10 @@ This project uses GitHub Actions for automated build, test, and benchmark. See `
 To simulate CI locally:
 
 ```sh
-xmake --yes --file=xmake.ci.lua
-xmake run test_unit_gcc --file=xmake.ci.lua
-xmake run bench_gcc --file=xmake.ci.lua
+xmake f --toolchain=gcc --file=xmake.ci.lua --yes
+xmake --yes
+xmake run test_unit_gcc
+xmake run bench_gcc
 ```
 
 ## Build Requirements

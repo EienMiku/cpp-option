@@ -1,0 +1,14 @@
+# Build artifacts
+.xmake/
+build/
+.cache/
+
+# OS / editor
+.DS_Store
+.vscode/
+msvc_test/
+
+# Local scratch / personal files (not part of the project)
+.clangd
+src/scratch.cppm
+tools/visualize-bench/
